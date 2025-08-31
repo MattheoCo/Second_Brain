@@ -78,4 +78,6 @@ fi
 
 # Start PHP built-in server for simplicity (honor platform PORT if present)
 PORT_TO_BIND="${PORT:-8080}"
+# Ensure session path exists so CSRF/session can persist
+mkdir -p var/sessions/"${APP_ENV:-prod}"
 exec php -S 0.0.0.0:"$PORT_TO_BIND" -t public
