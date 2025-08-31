@@ -22,10 +22,11 @@ class GradeType extends AbstractType
                 'choices' => SessionType::cases(),
                 'choice_label' => fn(SessionType $t) => $t->value,
                 'choice_value' => fn(?SessionType $t) => $t?->value,
+                'placeholder' => 'Sélectionner',
             ])
-            ->add('score', NumberType::class, ['label' => 'Note (/20)', 'scale' => 2])
-            ->add('weight', NumberType::class, ['label' => 'Coefficient', 'scale' => 2, 'empty_data' => '1'])
-            ->add('gradedAt', DateTimeType::class, ['label' => 'Date', 'widget' => 'single_text']);
+            ->add('score', NumberType::class, ['label' => 'Note (/20)', 'scale' => 2, 'html5' => true])
+            ->add('weight', NumberType::class, ['label' => 'Coefficient', 'scale' => 2, 'html5' => true, 'empty_data' => '1'])
+            ->add('gradedAt', DateTimeType::class, ['label' => 'Date', 'widget' => 'single_text', 'html5' => true]);
     }
 
     public function configureOptions(OptionsResolver $resolver): void
