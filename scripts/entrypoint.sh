@@ -56,8 +56,9 @@ if [ -f bin/console ]; then
   # If using Postgres, the historical migrations are SQLite-specific.
   # Use schema:update to create the schema, then mark migrations as executed.
   if echo "${DATABASE_URL:-}" | grep -qE '^postgres'; then
-    php bin/console doctrine:schema:update --force --no-interaction || true
-    php bin/console doctrine:migrations:version --add --all --no-interaction || true
+  php bin/console doctrine:schema:update --force --no-interaction || true
+  php bin/console doctrine:migrations:sync-metadata-storage --no-interaction || true
+  php bin/console doctrine:migrations:version --add --all --no-interaction || true
   else
     php bin/console doctrine:migrations:migrate --no-interaction || true
   fi
@@ -65,6 +66,7 @@ fi
 
 # Compile asset map (safe to run in prod so assets are available under public/assets)
 if [ -f bin/console ]; then
+  php bin/console importmap:install --no-interaction || true
   php bin/console asset-map:compile || true
 fi
 
