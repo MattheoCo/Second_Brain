@@ -1,6 +1,6 @@
 webpack_encore:
-    # If/when you use Webpack Encore, you can enable this block and build to public/build
-    # output_path: '%kernel.project_dir%/public/build'
+    # Disable the default build since we use AssetMapper
+    output_path: false
     script_attributes:
         defer: true
 
