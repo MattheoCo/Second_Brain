@@ -1,8 +1,0 @@
-webpack_encore:
-    # Disable the default build since we use AssetMapper
-    output_path: false
-    script_attributes:
-        defer: true
-
-# IMPORTANT: We're using AssetMapper. Do not set a json_manifest_path here,
-# otherwise all asset() calls will require public/build/manifest.json.
