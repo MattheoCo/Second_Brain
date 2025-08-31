@@ -1,2 +1,8 @@
-<?php // Legacy controller accidentally placed under Entity; kept empty to avoid routing. 
+<?php
+namespace App\Entity;
+
+/**
+ * Legacy stub kept only to satisfy PSR-4 scanning. Do not use.
+ */
+final class UserDataApiController {}
 
