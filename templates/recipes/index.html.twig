@@ -1,0 +1,260 @@
+{% extends 'base.html.twig' %}
+{% block title %}{{ title|default('Recettes') }}{% endblock %}
+
+{% block body %}
+    <header class="rec-header">
+        <h1 class="page-title">Recettes</h1>
+        <div class="toolbar">
+            <button id="btnExport" class="btn btn-ghost">📤 Exporter</button>
+            <button id="btnImport" class="btn btn-ghost">📥 Importer</button>
+        </div>
+    </header>
+
+    <div class="page-actions" style="margin-bottom:.6rem;">
+        <a href="{{ path('app_dashboard') }}" class="btn btn-ghost">⟵ Retour au menu</a>
+    </div>
+
+    <section class="card" style="margin:.8rem 0;">
+        <form id="formAdd" class="rec-add" autocomplete="off">
+            <input id="title" type="text" placeholder="Titre de la recette" required />
+            <input id="tags" type="text" placeholder="Tags (ex: rapide, végétarien)" />
+            <input id="time" type="number" min="0" step="1" placeholder="Temps (min)" />
+            <input id="servings" type="number" min="1" step="1" placeholder="Portions" />
+            <input id="url" type="url" placeholder="URL source (optionnel)" />
+            <textarea id="ingredients" rows="3" placeholder="Ingrédients (1 par ligne)"></textarea>
+            <textarea id="steps" rows="4" placeholder="Étapes (1 par ligne)"></textarea>
+            <button class="btn" type="submit">Ajouter</button>
+        </form>
+
+        <div class="rec-helpers">
+            <input id="search" type="search" placeholder="Rechercher une recette…" />
+            <div id="chips" class="chips" aria-label="Filtrer par tag"></div>
+        </div>
+    </section>
+
+    <section id="app" class="rec-grid"></section>
+
+    <style>
+        .rec-header{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+        .rec-header .page-title{margin:0;flex:1 1 auto}
+        .toolbar{display:flex;gap:.4rem;flex:0 0 auto}
+
+        .rec-add{display:grid;gap:.5rem;grid-template-columns:1fr}
+        .rec-add input,.rec-add textarea{width:100%;padding:.6rem .7rem;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:var(--bg-soft);color:var(--text)}
+        .rec-add .btn{width:100%}
+        @media(min-width:760px){.rec-add{grid-template-columns:1.6fr 1fr .8fr .8fr 1.6fr;align-items:start}
+            #ingredients{grid-column:1/4} #steps{grid-column:4/6} .rec-add .btn{grid-column:1/6;width:auto}
+        }
+
+        .rec-helpers{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin-top:.6rem}
+        .rec-helpers input[type="search"]{flex:1 1 260px;padding:.6rem .7rem;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:var(--bg-soft);color:var(--text)}
+        .chips{display:flex;gap:.35rem;flex-wrap:wrap;max-width:100%;overflow:visible;padding-bottom:0}
+        @media(max-width:719.98px){.chips{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:.2rem}.chip{flex:0 0 auto}}
+        .chip{padding:.25rem .55rem;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.08);font-weight:700;cursor:pointer}
+        .chip.active{background:rgba(37,99,235,.22);border-color:rgba(37,99,235,.45)}
+
+        .rec-grid{display:grid;gap:.9rem}
+        @media(min-width:900px){.rec-grid{grid-template-columns:repeat(2,1fr)}}
+        @media(min-width:1300px){.rec-grid{grid-template-columns:repeat(3,1fr)}}
+
+        .rec-card{background:var(--card);border:1px solid rgba(255,255,255,.08);border-radius:14px;display:flex;flex-direction:column}
+        .rec-head{display:flex;gap:.5rem;align-items:center;justify-content:space-between;padding:.55rem .8rem;border-bottom:1px solid rgba(255,255,255,.08)}
+        .rec-title{font-weight:800;margin:0;flex:1 1 auto}
+        .rec-meta{display:flex;gap:.5rem;align-items:center;color:rgba(255,255,255,.78);font-weight:700}
+        .rec-body{padding:.6rem;display:grid;gap:.6rem}
+        .badge{padding:.05rem .45rem;border-radius:999px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);font-weight:800;font-size:.78rem}
+        .actions{display:flex;gap:.35rem;align-items:center}
+        .icon-btn{width:34px;height:34px}
+        .muted{color:rgba(255,255,255,.75)}
+        ul,ol{padding-left:1.2rem;margin:0}
+    </style>
+
+    <script>
+        {% include '_partials/userdata_api.js' %}
+        (async () => {
+            const STORAGE_KEY = 'recipes:v1';
+            const qs = (s, r=document)=>r.querySelector(s);
+            const qsa = (s, r=document)=>Array.from(r.querySelectorAll(s));
+
+            const state = {
+                recipes: await (async()=>{ try{return await apiLoad('recipes');}catch{return []} })(),
+                filter: '',
+                tagFilter: null,
+            };
+
+            // Elements
+            const app = qs('#app');
+            const form = qs('#formAdd');
+            const title = qs('#title');
+            const tags = qs('#tags');
+            const time = qs('#time');
+            const servings = qs('#servings');
+            const url = qs('#url');
+            const ingredients = qs('#ingredients');
+            const steps = qs('#steps');
+            const search = qs('#search');
+            const chips = qs('#chips');
+            const btnExport = qs('#btnExport');
+            const btnImport = qs('#btnImport');
+
+            // Events
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const t = title.value.trim();
+                if (!t) return;
+                const r = {
+                    id: crypto.randomUUID(),
+                    title: t,
+                    tags: parseTags(tags.value),
+                    time: numVal(time.value),
+                    servings: numVal(servings.value),
+                    url: url.value.trim() || null,
+                    ingredients: splitLines(ingredients.value),
+                    steps: splitLines(steps.value),
+                    favorite: false,
+                };
+                state.recipes.push(r);
+                apiSave('recipes', state.recipes).catch(console.error);
+                resetForm(); render();
+            });
+
+            search.addEventListener('input', ()=>{ state.filter = search.value.trim().toLowerCase(); render(); });
+            btnExport.addEventListener('click', async () => {
+                const data = JSON.stringify(state.recipes, null, 2);
+                try { await navigator.clipboard.writeText(data); alert('Export JSON copié ✅'); }
+                catch { alert('Copie impossible.\n\n' + data); }
+            });
+            btnImport.addEventListener('click', () => {
+                const data = prompt('Coller un JSON de recettes :', '');
+                if (!data) return;
+                try {
+                    const arr = JSON.parse(data);
+                    if (!Array.isArray(arr)) throw new Error('format');
+                    // normaliser minimalement
+                    arr.forEach(x => x.id ||= crypto.randomUUID());
+                    state.recipes = arr; apiSave('recipes', state.recipes).catch(console.error); render();
+                } catch { alert('Format invalide.'); }
+            });
+
+            // Render
+            function render() {
+                // chips tags dynamiques
+                renderChips();
+
+                const items = filtered(state.recipes);
+                app.innerHTML = '';
+                if (!items.length) {
+                    app.innerHTML = `<div class="card"><div class="muted" style="padding:.8rem;">Aucune recette. Ajoutez‑en ci‑dessus.</div></div>`;
+                    return;
+                }
+                items.forEach(r => app.appendChild(card(r)));
+            }
+
+            function renderChips() {
+                const set = new Set(state.recipes.flatMap(r => r.tags || []));
+                chips.innerHTML = '';
+                [...set].sort((a,b)=>a.localeCompare(b)).forEach(tag => {
+                    const c = document.createElement('button');
+                    c.type = 'button'; c.className = 'chip';
+                    c.textContent = '#' + tag;
+                    c.classList.toggle('active', state.tagFilter === tag);
+                    c.addEventListener('click', () => {
+                        state.tagFilter = state.tagFilter === tag ? null : tag;
+                        render();
+                    });
+                    chips.appendChild(c);
+                });
+            }
+
+            function card(r) {
+                const root = document.createElement('article');
+                root.className = 'rec-card';
+                root.innerHTML = `
+      <div class="rec-head">
+        <h3 class="rec-title">${escapeHtml(r.title)}</h3>
+        <div class="actions">
+          <button class="icon-btn" title="${r.favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}">${r.favorite ? '⭐' : '☆'}</button>
+          <button class="icon-btn" title="Copier">${'📋'}</button>
+          <button class="icon-btn" title="Supprimer">${'🗑️'}</button>
+        </div>
+      </div>
+      <div class="rec-body">
+        <div class="rec-meta">
+          ${r.time ? `<span class="badge">⏱️ ${r.time} min</span>` : ''}
+          ${r.servings ? `<span class="badge">🍽️ ${r.servings} p.</span>` : ''}
+          ${(r.tags||[]).map(t=>`<span class="badge">#${escapeHtml(t)}</span>`).join(' ')}
+          ${r.url ? `<a href="${escapeAttr(r.url)}" target="_blank" rel="noopener" class="badge">🔗 Source</a>` : ''}
+        </div>
+        ${r.ingredients?.length ? `
+          <div>
+            <div class="muted" style="font-weight:700;margin-bottom:.3rem;">Ingrédients</div>
+            <ul>${r.ingredients.map(li=>`<li>${escapeHtml(li)}</li>`).join('')}</ul>
+          </div>` : ''
+                }
+        ${r.steps?.length ? `
+          <div>
+            <div class="muted" style="font-weight:700;margin-bottom:.3rem;">Étapes</div>
+            <ol>${r.steps.map(li=>`<li>${escapeHtml(li)}</li>`).join('')}</ol>
+          </div>` : ''
+                }
+      </div>
+    `;
+
+                // actions
+                const [btnFav, btnCopy, btnDel] = root.querySelectorAll('.icon-btn');
+                btnFav.addEventListener('click', () => { r.favorite = !r.favorite; apiSave('recipes', state.recipes).catch(console.error); render(); });
+                btnCopy.addEventListener('click', async () => {
+                    const txt = exportOne(r);
+                    try { await navigator.clipboard.writeText(txt); alert('Recette copiée ✅'); }
+                    catch { alert('Copie impossible.\n\n' + txt); }
+                });
+                btnDel.addEventListener('click', () => {
+                    if (!confirm(`Supprimer "${r.title}" ?`)) return;
+                    state.recipes = state.recipes.filter(x => x.id !== r.id);
+                    apiSave('recipes', state.recipes).catch(console.error); render();
+                });
+
+                return root;
+            }
+
+            // Helpers
+            function filtered(arr){
+                return arr.filter(r=>{
+                    if (state.tagFilter && !(r.tags||[]).includes(state.tagFilter)) return false;
+                    if (state.filter){
+                        const hay = `${r.title} ${(r.tags||[]).join(' ')} ${(r.ingredients||[]).join(' ')} ${(r.steps||[]).join(' ')}`.toLowerCase();
+                        if (!hay.includes(state.filter)) return false;
+                    }
+                    return true;
+                });
+            }
+            function splitLines(v){ return v.split(/\r?\n/).map(s=>s.trim()).filter(Boolean); }
+            function parseTags(v){
+                return v.split(/[,#]/).map(s=>s.trim().toLowerCase()).filter(Boolean);
+            }
+            function numVal(v){ const n = Number(v); return Number.isFinite(n) && n>0 ? n : null; }
+            function save(){}
+            function load(){ return []; }
+            function exportOne(r){
+                const lines = [];
+                lines.push(`# ${r.title}`);
+                if (r.time || r.servings) lines.push(`- ${r.time? r.time+' min' : ''} ${r.servings? '• '+r.servings+' p.' : ''}`.trim());
+                if (r.tags?.length) lines.push('- Tags: ' + r.tags.map(t=>'#'+t).join(' '));
+                if (r.url) lines.push('- Source: ' + r.url);
+                if (r.ingredients?.length){ lines.push('\n## Ingrédients'); r.ingredients.forEach(i=>lines.push('- ' + i)); }
+                if (r.steps?.length){ lines.push('\n## Étapes'); r.steps.forEach((s,i)=>lines.push((i+1)+'. '+s)); }
+                return lines.join('\n').trim();
+            }
+            function escapeHtml(s){ return s.replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
+            function escapeAttr(s){ return s.replace(/"/g,'&quot;'); }
+
+            function resetForm(){
+                form.reset();
+                servings.value = '';
+                time.value = '';
+            }
+
+            render();
+        })();
+    </script>
+{% endblock %}

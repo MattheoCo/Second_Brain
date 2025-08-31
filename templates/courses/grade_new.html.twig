@@ -1,0 +1,20 @@
+{% extends 'base.html.twig' %}
+{% block title %}Nouvelle note — {{ course.name }}{% endblock %}
+
+{% block body %}
+    <div class="page-actions" style="margin-bottom:.6rem;">
+        <a href="{{ path('app_courses') }}" class="btn btn-ghost">⟵ Retour au menu</a>
+    </div>
+
+    {% form_theme form 'forms/_theme.html.twig' %}
+    <h1 class="page-title">Nouvelle note — {{ course.name }}</h1>
+    <div class="card">
+        {{ form_start(form) }}
+        {{ form_widget(form) }}
+        <div class="form-actions">
+            <button class="btn">Enregistrer</button>
+            <a href="{{ path('app_course_show', {id: course.id}) }}" class="btn btn-ghost">Annuler</a>
+        </div>
+        {{ form_end(form) }}
+    </div>
+{% endblock %}

@@ -1,0 +1,500 @@
+{% extends 'base.html.twig' %}
+{% block title %}{{ title|default('Liste de courses') }}{% endblock %}
+
+{% block body %}
+    <header class="shopping-header">
+        <h1 class="page-title">Liste de courses</h1>
+        <div class="toolbar">
+            <button id="btnShare" class="btn btn-ghost">📤 Partager</button>
+            <button id="btnImport" class="btn btn-ghost">📥 Importer</button>
+            <button id="btnClear" class="btn btn-ghost">🧹 Vider cochés</button>
+        </div>
+    </header>
+
+    <div class="page-actions" style="margin-bottom:.6rem;">
+        <a href="{{ path('app_dashboard') }}" class="btn btn-ghost">⟵ Retour au menu</a>
+    </div>
+
+    <section class="card" style="margin:.8rem 0;">
+        <form id="addForm" class="shopping-add">
+            <input type="text" id="label" placeholder="Produit" required />
+            <input type="number" id="qty" min="1" step="1" value="1" placeholder="Qté" />
+            <select id="cat" aria-label="Rayon">
+                <option value="">Rayon…</option>
+            </select>
+            <input type="text" id="note" placeholder="Note (optionnel)" />
+            <label class="toggle" title="Priorité">
+                <input type="checkbox" id="prio" />
+                <span>Priorité</span>
+            </label>
+            <button class="btn" type="submit">Ajouter</button>
+        </form>
+
+        <div class="shopping-helpers">
+            <div class="chips" id="chipsCats" aria-label="Filtres de rayons"></div>
+            <div class="tools">
+                <input type="search" id="search" placeholder="Rechercher…" />
+                <label class="toggle">
+                    <input type="checkbox" id="toggleGroup" checked />
+                    <span>Regrouper par rayon</span>
+                </label>
+                <label class="toggle">
+                    <input type="checkbox" id="toggleHideBought" checked />
+                    <span>Masquer achetés</span>
+                </label>
+            </div>
+        </div>
+    </section>
+
+    <section id="shoppingApp" class="shopping-app"></section>
+
+    <details id="boughtPanel" class="card bought-panel">
+        <summary class="bought-summary">Achetés (<span id="boughtCount">0</span>)</summary>
+        <div id="boughtList" class="bought-list"></div>
+    </details>
+
+    <style>
+        .shopping-header {
+            display:flex; align-items:center; gap:.6rem; flex-wrap:wrap;
+        }
+        .shopping-header .page-title {
+            margin:0; flex:1 1 auto;
+        }
+        .toolbar {
+            display:flex; gap:.4rem; flex:1 1 100%;
+            overflow-x:auto; padding-bottom:.2rem;
+            -webkit-overflow-scrolling:touch;
+        }
+        @media (min-width: 720px) {
+            .toolbar { flex:0 0 auto; overflow:visible; }
+        }
+
+        .shopping-add {
+            display:grid; gap:.5rem; align-items:center;
+            grid-template-columns: 1fr;
+        }
+        .shopping-add input, .shopping-add select, .tools input[type="search"] {
+            width:100%;
+            padding:.6rem .7rem; border-radius:10px;
+            border:1px solid rgba(255,255,255,.14);
+            background: var(--bg-soft); color: var(--text);
+        }
+        .shopping-add .toggle { display:flex; align-items:center; gap:.35rem; }
+        .shopping-add button { width:100%; }
+        @media (min-width: 600px) {
+            .shopping-add { grid-template-columns: 2fr 1fr 1.4fr 2fr auto auto; }
+            .shopping-add button { width:auto; }
+        }
+        @media (min-width: 1000px) {
+            .shopping-add { grid-template-columns: 2fr .8fr 1.2fr 2fr auto auto; }
+        }
+
+        .shopping-helpers {
+            display:flex; gap:.8rem; align-items:center; justify-content:space-between;
+            margin-top:.6rem; flex-wrap:wrap;
+        }
+        .chips {
+            display: flex;
+            gap: .35rem;
+            flex-wrap: wrap;
+            max-width: 100%;
+            overflow: visible;
+            padding-bottom: 0;
+        }
+
+        /* Mobile: activer le défilement horizontal */
+        @media (max-width: 719.98px) {
+            .chips {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                padding-bottom: .2rem;
+            }
+            .chip { flex: 0 0 auto; }
+        }
+        .chip.active { background: rgba(37,99,235,.22); border-color: rgba(37,99,235,.45); }
+        .tools { display:flex; gap:.6rem; align-items:center; flex:1 1 260px; flex-wrap:wrap; }
+        .toggle { display:inline-flex; gap:.35rem; align-items:center; font-weight:700; }
+
+        .shopping-app { display:grid; gap:.9rem; }
+        @media (min-width: 900px) { .shopping-app { grid-template-columns: repeat(2, 1fr); } }
+        @media (min-width: 1300px) { .shopping-app { grid-template-columns: repeat(3, 1fr); } }
+
+        .section { background: var(--card); border:1px solid rgba(255,255,255,.08); border-radius:14px; }
+        .section-header { display:flex; align-items:center; justify-content:space-between; padding:.55rem .8rem; border-bottom:1px solid rgba(255,255,255,.08); }
+        .section-title { display:flex; align-items:center; gap:.5rem; font-weight:800; }
+        .section-body { display:grid; grid-template-columns: 1fr; gap:.55rem; padding:.6rem; }
+        @media (min-width: 600px) { .section-body { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); } }
+
+        .item { display:flex; align-items:stretch; gap:.45rem; padding:.5rem; border-radius:12px; border:1px solid rgba(255,255,255,.10); background: var(--bg-soft); }
+        .item[draggable="true"] { cursor:grab; }
+        .item.dragging { opacity:.6; }
+        .item input[type="checkbox"] { margin:.1rem .2rem 0 0; }
+        .item-main { display:flex; flex-direction:column; gap:.2rem; flex:1 1 auto; min-width:0; }
+        .item-top { display:flex; align-items:center; gap:.4rem; flex-wrap:wrap; }
+        .badge { padding:.05rem .45rem; border-radius:999px; background: rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.16); font-weight:800; font-size:.78rem; }
+        .badge-prio { background: rgba(239,68,68,.20); border-color: rgba(239,68,68,.45); }
+        .item-label[contenteditable="true"] { outline:none; border-bottom:1px dashed transparent; }
+        .item-label[contenteditable="true"]:focus { border-color: rgba(59,130,246,.55); }
+        .item-note { color: rgba(255,255,255,.75); font-size:.9rem; word-break: break-word; }
+        .item-actions { display:flex; gap:.3rem; align-items:center; }
+        .icon-btn { width:34px; height:34px; }
+
+        .muted { color: rgba(255,255,255,.75); }
+        .bought-panel { margin-top:1rem; }
+        .bought-summary { cursor:pointer; font-weight:700; padding:.5rem .6rem; }
+        .bought-list { display:flex; flex-wrap:wrap; gap:.35rem; padding:.6rem .6rem .8rem; }
+        .bought-pill { padding:.2rem .5rem; border-radius:999px; border:1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.06); }
+    </style>
+
+    <script>
+        {% include '_partials/userdata_api.js' %}
+        (async () => {
+            const STORAGE_KEY = 'shopping:list:v1';
+            const SECTIONS = [
+                { key: 'Fruits & Légumes', icon: '🥬' },
+                { key: 'Frais', icon: '🧊' },
+                { key: 'Épicerie', icon: '🥫' },
+                { key: 'Boucherie', icon: '🥩' },
+                { key: 'Boulangerie', icon: '🥖' },
+                { key: 'Boissons', icon: '🥤' },
+                { key: 'Entretien', icon: '🧽' },
+                { key: 'Hygiène', icon: '🧴' },
+                { key: 'Surgelés', icon: '❄️' },
+                { key: 'Animaux', icon: '🐾' },
+                { key: 'Maison', icon: '🏠' },
+                { key: 'Autres', icon: '🧺' },
+            ];
+
+            const qs = (s, r = document) => r.querySelector(s);
+            const qsa = (s, r = document) => Array.from(r.querySelectorAll(s));
+
+            const state = {
+                items: await (async()=>{ try{return await apiLoad('shopping');}catch{return []} })(),
+                group: true,
+                hideBought: true,
+                filter: '',
+                catFilter: null,
+                draggingId: null,
+            };
+
+            // Elements
+            const app = qs('#shoppingApp');
+            const boughtCount = qs('#boughtCount');
+            const boughtList = qs('#boughtList');
+            const addForm = qs('#addForm');
+            const inputLabel = qs('#label');
+            const inputQty = qs('#qty');
+            const catSelect = qs('#cat');
+            const inputNote = qs('#note');
+            const inputPrio = qs('#prio');
+            const chipsCats = qs('#chipsCats');
+            const search = qs('#search');
+            const toggleGroup = qs('#toggleGroup');
+            const toggleHideBought = qs('#toggleHideBought');
+            const btnClear = qs('#btnClear');
+            const btnShare = qs('#btnShare');
+            const btnImport = qs('#btnImport');
+
+            // Populate category select
+            SECTIONS.forEach(s => {
+                if (s.key === 'Autres') return; // éviter de proposer "Autres" en premier
+                const opt = document.createElement('option');
+                opt.value = s.key; opt.textContent = `${s.key}`;
+                catSelect.appendChild(opt);
+            });
+
+            // Chips filtres
+            SECTIONS.forEach(s => {
+                const chip = document.createElement('button');
+                chip.type = 'button';
+                chip.className = 'chip';
+                chip.textContent = `${s.icon} ${s.key}`;
+                chip.dataset.cat = s.key;
+                chip.addEventListener('click', () => {
+                    state.catFilter = state.catFilter === s.key ? null : s.key;
+                    qsa('.chip', chipsCats).forEach(c => c.classList.toggle('active', c.dataset.cat === state.catFilter));
+                    render();
+                });
+                chipsCats.appendChild(chip);
+            });
+
+            // Events
+            addForm.addEventListener('submit', e => {
+                e.preventDefault();
+                const label = inputLabel.value.trim();
+                if (!label) return;
+                const item = {
+                    id: crypto.randomUUID(),
+                    label,
+                    qty: Number(inputQty.value) || 1,
+                    note: inputNote.value.trim() || null,
+                    prio: inputPrio.checked,
+                    cat: catSelect.value || guessCategory(label),
+                    done: false,
+                };
+                state.items.push(item);
+                apiSave('shopping', state.items).catch(console.error);
+                inputLabel.value = '';
+                inputQty.value = '1';
+                catSelect.value = '';
+                inputNote.value = '';
+                inputPrio.checked = false;
+                inputLabel.focus();
+                render();
+            });
+
+            search.addEventListener('input', () => { state.filter = search.value.trim().toLowerCase(); render(); });
+            toggleGroup.addEventListener('change', () => { state.group = toggleGroup.checked; render(); });
+            toggleHideBought.addEventListener('change', () => { state.hideBought = toggleHideBought.checked; render(); });
+
+            btnClear.addEventListener('click', () => {
+                if (!confirm('Retirer tous les éléments cochés ?')) return;
+                state.items = state.items.filter(i => !i.done);
+                apiSave('shopping', state.items).catch(console.error); render();
+            });
+
+            btnShare.addEventListener('click', async () => {
+                const lines = exportText();
+                try {
+                    await navigator.clipboard.writeText(lines);
+                    alert('Liste copiée dans le presse‑papiers ✅');
+                } catch {
+                    alert('Copie impossible. Voici la liste:\n\n' + lines);
+                }
+            });
+
+            btnImport.addEventListener('click', () => {
+                const txt = prompt('Coller une liste (1 élément par ligne) :', '');
+                if (!txt) return;
+                const lines = txt.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+                lines.forEach(line => {
+                    const it = parseInput(line);
+                    it.id = crypto.randomUUID();
+                    state.items.push(it);
+                });
+                save(); render();
+            });
+
+            // Render
+            function render() {
+                const items = filtered(state.items);
+
+                // Bought
+                const bought = items.filter(i => i.done);
+                boughtCount.textContent = String(bought.length);
+                boughtList.innerHTML = '';
+                bought.forEach(i => {
+                    const b = document.createElement('span');
+                    b.className = 'bought-pill';
+                    b.textContent = pillText(i);
+                    boughtList.appendChild(b);
+                });
+
+                // Main
+                app.innerHTML = '';
+                const visible = state.hideBought ? items.filter(i => !i.done) : items;
+                if (!visible.length) {
+                    app.innerHTML = `<div class="card"><div class="muted" style="padding:.8rem;">Rien à afficher. Ajoute un élément ci‑dessus.</div></div>`;
+                    return;
+                }
+                if (state.group) renderGrouped(visible); else renderFlat(visible);
+            }
+
+            function renderGrouped(items) {
+                const groups = groupBy(items, 'cat');
+                // Sections dans l’ordre connu
+                SECTIONS.forEach(sec => {
+                    const arr = groups[sec.key] ?? [];
+                    if (!arr.length) return;
+                    app.appendChild(sectionElement(sec.key, sec.icon, arr));
+                });
+                // Restes non connus
+                Object.entries(groups).forEach(([cat, arr]) => {
+                    if (!SECTIONS.find(s => s.key === cat)) app.appendChild(sectionElement(cat, '🧺', arr));
+                });
+            }
+
+            function renderFlat(items) {
+                app.appendChild(sectionElement('Liste', '📝', items));
+            }
+
+            function sectionElement(title, icon, items) {
+                const root = document.createElement('div');
+                root.className = 'section';
+                root.innerHTML = `
+                    <div class="section-header">
+                        <div class="section-title"><span>${icon}</span><span>${escapeHtml(title)}</span><span class="muted">(${items.length})</span></div>
+                        <div class="section-actions">
+                            <button class="icon-btn" title="Cocher tout" data-action="check-all">✔️</button>
+                            <button class="icon-btn" title="Vider" data-action="clear">🗑️</button>
+                        </div>
+                    </div>
+                    <div class="section-body"></div>
+                `;
+                const body = root.querySelector('.section-body');
+
+                root.querySelector('[data-action="check-all"]').addEventListener('click', () => {
+                    items.forEach(i => i.done = true);
+                    apiSave('shopping', state.items).catch(console.error); render();
+                });
+                root.querySelector('[data-action="clear"]').addEventListener('click', () => {
+                    if (!confirm(`Supprimer ${items.length} éléments ?`)) return;
+                    const ids = new Set(items.map(i => i.id));
+                    state.items = state.items.filter(i => !ids.has(i.id));
+                    apiSave('shopping', state.items).catch(console.error); render();
+                });
+
+                items.forEach((it, idx) => body.appendChild(itemElement(it, idx)));
+                return root;
+            }
+
+            function itemElement(it, idx) {
+                const el = document.createElement('div');
+                el.className = 'item';
+                el.draggable = true;
+                el.dataset.id = it.id;
+                el.innerHTML = `
+                    <input type="checkbox" ${it.done ? 'checked' : ''} aria-label="Marquer comme acheté" />
+                    <div class="item-main">
+                        <div class="item-top">
+                            <span class="badge">${qtyText(it)}</span>
+                            ${it.prio ? '<span class="badge badge-prio">Priorité</span>' : ''}
+                            <span class="item-label" contenteditable="true">${escapeHtml(it.label)}</span>
+                        </div>
+                        ${it.note ? `<div class="item-note">${escapeHtml(it.note)}</div>` : ''}
+                    </div>
+                    <div class="item-actions">
+                        <select class="cat-select" title="Rayon">
+                            ${sectionOptions(it.cat)}
+                        </select>
+                        <button class="icon-btn" title="Dupliquer">🧩</button>
+                        <button class="icon-btn" title="Supprimer">🗑️</button>
+                    </div>
+                `;
+
+                // Checkbox
+                el.querySelector('input[type="checkbox"]').addEventListener('change', (e) => {
+                    it.done = e.target.checked; apiSave('shopping', state.items).catch(console.error); render();
+                });
+                // Label edit
+                const labelEl = el.querySelector('.item-label');
+                labelEl.addEventListener('blur', () => { it.label = labelEl.textContent.trim() || it.label; apiSave('shopping', state.items).catch(console.error); render(); });
+                labelEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); labelEl.blur(); }});
+                // Cat select
+                el.querySelector('.cat-select').addEventListener('change', (e) => { it.cat = e.target.value; apiSave('shopping', state.items).catch(console.error); render(); });
+                // Duplicate
+                el.querySelectorAll('.icon-btn')[0].addEventListener('click', () => {
+                    const copy = { ...it, id: crypto.randomUUID(), done: false };
+                    state.items.push(copy); apiSave('shopping', state.items).catch(console.error); render();
+                });
+                // Delete
+                el.querySelectorAll('.icon-btn')[1].addEventListener('click', () => {
+                    state.items = state.items.filter(x => x.id !== it.id); apiSave('shopping', state.items).catch(console.error); render();
+                });
+
+                // DnD (surtout desktop)
+                el.addEventListener('dragstart', () => { el.classList.add('dragging'); state.draggingId = it.id; });
+                el.addEventListener('dragend', () => { el.classList.remove('dragging'); state.draggingId = null; });
+                el.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    const srcId = state.draggingId;
+                    if (!srcId || srcId === it.id) return;
+                    const arr = state.group ? state.items.filter(x => x.cat === it.cat) : state.items;
+                    const ids = arr.map(x => x.id);
+                    const srcIdx = ids.indexOf(srcId);
+                    const dstIdx = ids.indexOf(it.id);
+                    if (srcIdx < 0 || dstIdx < 0) return;
+
+                    if (state.group) {
+                        const groupKey = it.cat;
+                        const all = state.items;
+                        const groupIdxs = all.map((x, i) => [x, i]).filter(([x]) => x.cat === groupKey).map(([, i]) => i);
+                        const realSrc = groupIdxs[srcIdx];
+                        const realDst = groupIdxs[dstIdx];
+                        move(state.items, realSrc, realDst);
+                    } else {
+                        const allIds = state.items.map(x => x.id);
+                        move(state.items, allIds.indexOf(srcId), allIds.indexOf(it.id));
+                    }
+                    save(); render();
+                });
+
+                return el;
+            }
+
+            // Helpers
+            function move(arr, from, to) {
+                if (from === to || from < 0 || to < 0) return;
+                const [spliced] = arr.splice(from, 1);
+                arr.splice(to, 0, spliced);
+            }
+            function sectionOptions(selected) {
+                const known = SECTIONS.map(s => s.key);
+                const set = new Set([...(selected && !known.includes(selected) ? [selected] : []), ...known]);
+                return [...set].map(k => `<option value="${k}" ${k === selected ? 'selected' : ''}>${k}</option>`).join('');
+            }
+            function qtyText(it) { return it.qty ? `${it.qty}` : '1'; }
+            function pillText(i) { return `${i.qty ? i.qty + '× ' : ''}${i.label}${i.cat ? ' — ' + i.cat : ''}`; }
+            function groupBy(arr, key) {
+                return arr.reduce((acc, it) => {
+                    const k = it[key] || 'Autres';
+                    (acc[k] ||= []).push(it); return acc;
+                }, {});
+            }
+            function filtered(arr) {
+                return arr.filter(i => {
+                    if (state.catFilter && i.cat !== state.catFilter) return false;
+                    if (state.filter) {
+                        const hay = `${i.label} ${i.note || ''} ${i.cat || ''}`.toLowerCase();
+                        if (!hay.includes(state.filter)) return false;
+                    }
+                    return true;
+                });
+            }
+            function parseInput(text) {
+                let t = text.trim();
+                let prio = /!+$/.test(t); t = t.replace(/!+$/,'').trim();
+                let noteMatch = t.match(/\(([^)]+)\)\s*$/); let note = noteMatch ? noteMatch[1].trim() : null; if (noteMatch) t = t.replace(/\([^)]+\)\s*$/,'').trim();
+                let catMatch = t.match(/@([^@#()!]+)$/); let cat = catMatch ? catMatch[1].trim() : null; if (catMatch) t = t.replace(/@([^@#()!]+)$/,'').trim();
+                let qty = 1;
+                let m = t.match(/^\s*(\d+(?:[.,]\d+)?)\s*x?\s+/i);
+                if (m) { qty = Number(m[1].replace(',','.')); t = t.slice(m[0].length).trim(); }
+                else {
+                    m = t.match(/\s+(\d+(?:[.,]\d+)?)\s*x?$/i);
+                    if (m) { qty = Number(m[1].replace(',','.')); t = t.slice(0, t.length - m[0].length).trim(); }
+                }
+                if (!cat) cat = guessCategory(t);
+                return { id: '', label: t, qty, note, prio, cat, done: false };
+            }
+            function guessCategory(label) {
+                const l = label.toLowerCase();
+                if (/(pomme|banane|salade|tomate|oignon|carotte)/.test(l)) return 'Fruits & Légumes';
+                if (/(lait|yaourt|fromage|beurre|crème)/.test(l)) return 'Frais';
+                if (/(pâtes|riz|farine|sucre|sel|huile|thon|biscuits)/.test(l)) return 'Épicerie';
+                if (/(poulet|boeuf|steak|jambon|saucisse)/.test(l)) return 'Boucherie';
+                if (/(pain|baguette|brioche)/.test(l)) return 'Boulangerie';
+                if (/(eau|soda|jus|bière|vin)/.test(l)) return 'Boissons';
+                if (/(lessive|liquide vaisselle|éponge|essuie|javel|savon)/.test(l)) return 'Entretien';
+                return 'Autres';
+            }
+            function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state.items)); }
+            function load() {
+                try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; }
+            }
+            function exportText() {
+                const groups = groupBy(state.items.filter(i => !i.done), 'cat');
+                const lines = [];
+                Object.keys(groups).forEach(cat => {
+                    lines.push(`## ${cat}`);
+                    groups[cat].forEach(i => lines.push(`- ${qtyText(i)} × ${i.label}${i.note ? ' ('+i.note+')' : ''}${i.prio ? ' !' : ''}`));
+                    lines.push('');
+                });
+                return lines.join('\n').trim();
+            }
+            function escapeHtml(s) { return s.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m])); }
+
+            render();
+        })();
+    </script>
+{% endblock %}

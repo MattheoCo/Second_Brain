@@ -1,0 +1,540 @@
+{% extends 'base.html.twig' %}
+{% block title %}{{ title|default('Finances') }}{% endblock %}
+
+{% block body %}
+    <header class="fin-header">
+        <h1 class="page-title">Finances</h1>
+        <div class="toolbar">
+            <button id="btnExport" class="btn btn-ghost">📤 Exporter</button>
+            <button id="btnImport" class="btn btn-ghost">📥 Importer</button>
+        </div>
+    </header>
+
+    <div class="page-actions" style="margin-bottom:.6rem;">
+        <a href="{{ path('app_dashboard') }}" class="btn btn-ghost">⟵ Retour au menu</a>
+    </div>
+
+    <section class="card" style="margin:.8rem 0;">
+        <form id="txForm" class="fin-add" autocomplete="off">
+            <input id="txLabel" type="text" placeholder="Libellé" required />
+            <input id="txDate" type="date" required />
+            <select id="txType" aria-label="Type">
+                <option value="-" selected>Sortie (-)</option>
+                <option value="+">Entrée (+)</option>
+            </select>
+            <input id="txAmount" type="number" step="0.01" placeholder="Montant" required />
+            <select id="txAccount" aria-label="Compte"></select>
+            <select id="txCat" aria-label="Catégorie"></select>
+            <input id="txNote" type="text" placeholder="Note (optionnel)" />
+            <button class="btn" type="submit">Ajouter</button>
+        </form>
+
+        <form id="accForm" class="fin-acc" autocomplete="off">
+            <input id="accName" type="text" placeholder="Nouveau compte" />
+            <input id="accInit" type="number" step="0.01" placeholder="Solde initial" />
+            <button class="btn btn-ghost" type="submit">+ Compte</button>
+        </form>
+
+        <div class="fin-helpers">
+            <input id="month" type="month" />
+            <select id="fltAccount"></select>
+            <input id="search" type="search" placeholder="Rechercher…" />
+            <div id="chips" class="chips" aria-label="Filtrer par catégorie"></div>
+        </div>
+    </section>
+
+    <section class="fin-summary">
+        <div class="card stat">
+            <div class="stat-title">Dépenses</div>
+            <div id="sumOut" class="stat-val">0,00 €</div>
+        </div>
+        <div class="card stat">
+            <div class="stat-title">Entrées</div>
+            <div id="sumIn" class="stat-val">0,00 €</div>
+        </div>
+        <div class="card stat">
+            <div class="stat-title">Solde mois</div>
+            <div id="sumNet" class="stat-val">0,00 €</div>
+        </div>
+        <div class="card stat">
+            <div class="stat-title">Solde total comptes</div>
+            <div id="sumAll" class="stat-val">0,00 €</div>
+        </div>
+    </section>
+
+    <section class="card" style="margin:.9rem 0;">
+        <header class="section-head">
+            <div class="section-title">Comptes</div>
+        </header>
+        <div id="accounts" class="acc-list"></div>
+    </section>
+
+    <section class="card" style="margin:.9rem 0;">
+        <header class="section-head">
+            <div class="section-title">Budget du mois</div>
+        </header>
+        <div id="budgets" class="bud-list"></div>
+    </section>
+
+    <section id="txApp" class="card">
+        <header class="section-head">
+            <div class="section-title">Transactions</div>
+        </header>
+        <div id="txList" class="tx-list"></div>
+    </section>
+
+    <style>
+        .fin-header{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+        .fin-header .page-title{margin:0;flex:1 1 auto}
+        .toolbar{display:flex;gap:.4rem;flex:0 0 auto}
+
+        .fin-add{display:grid;gap:.5rem;grid-template-columns:1fr}
+        .fin-acc{display:grid;gap:.5rem;grid-template-columns:1fr 1fr auto;margin-top:.6rem}
+        .fin-add input,.fin-add select,.fin-acc input,.fin-helpers input,.fin-helpers select{
+            width:100%;padding:.6rem .7rem;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:var(--bg-soft);color:var(--text)
+        }
+        .fin-add .btn{width:100%}
+        @media(min-width:900px){
+            .fin-add{grid-template-columns:1.4fr .9fr .7fr .9fr 1fr 1fr 1.4fr auto;align-items:start}
+            .fin-add .btn{width:auto}
+        }
+
+        .fin-helpers{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin-top:.6rem}
+        .fin-helpers input[type="search"]{flex:1 1 260px}
+        .chips{display:flex;gap:.35rem;flex-wrap:wrap;max-width:100%;overflow:visible;padding-bottom:0}
+        @media(max-width:719.98px){.chips{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:.2rem}.chip{flex:0 0 auto}}
+        .chip{padding:.25rem .55rem;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.08);font-weight:700;cursor:pointer}
+        .chip.active{background:rgba(37,99,235,.22);border-color:rgba(37,99,235,.45)}
+
+        .fin-summary{display:grid;gap:.8rem;margin:.9rem 0}
+        @media(min-width:800px){.fin-summary{grid-template-columns:repeat(4,1fr)}}
+        .stat{padding:.7rem}
+        .stat-title{color:rgba(255,255,255,.78);font-weight:700;margin-bottom:.2rem}
+        .stat-val{font-size:1.4rem;font-weight:900}
+
+        .section-head{display:flex;align-items:center;justify-content:space-between;padding:.55rem .8rem;border-bottom:1px solid rgba(255,255,255,.08)}
+        .section-title{font-weight:800}
+
+        .acc-list{display:grid;gap:.5rem;padding:.6rem}
+        @media(min-width:700px){.acc-list{grid-template-columns:repeat(2,1fr)}}
+        @media(min-width:1100px){.acc-list{grid-template-columns:repeat(3,1fr)}}
+        .acc{display:flex;justify-content:space-between;gap:.6rem;align-items:center;border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:.5rem;background:var(--bg-soft)}
+        .acc h4{margin:0;font-weight:800}
+        .acc small{color:rgba(255,255,255,.78)}
+        .acc-inline{display:flex;gap:.4rem;align-items:center}
+        .acc-inline input{width:130px}
+
+        .bud-list{display:grid;gap:.5rem;padding:.6rem}
+        .bud-row{display:grid;gap:.5rem;grid-template-columns:1.2fr .8fr 1fr}
+        .bud-bar{height:8px;border-radius:999px;background:rgba(255,255,255,.12);overflow:hidden}
+        .bud-bar>span{display:block;height:100%;background:#ef4444}
+
+        .tx-list{display:grid;gap:.2rem;padding:.6rem}
+        .tx{display:grid;gap:.4rem;grid-template-columns:1fr auto auto;align-items:center;border-bottom:1px dashed rgba(255,255,255,.12);padding:.35rem 0}
+        .tx .muted{color:rgba(255,255,255,.75)}
+        .tx-amt{font-weight:900}
+        .tx-amt.pos{color:#10b981}
+        .tx-amt.neg{color:#ef4444}
+        .icon-btn{width:32px;height:32px}
+    </style>
+
+    <script>
+        (() => {
+            const STORAGE_KEY = 'finance:v1';
+            const CATS = ['Alimentation','Logement','Transport','Loisirs','Santé','Shopping','Abonnements','Impôts','Salaire','Épargne','Autre'];
+
+            const qs = (s,r=document)=>r.querySelector(s);
+            const qsa = (s,r=document)=>Array.from(r.querySelectorAll(s));
+            const eur = n => (Number(n)||0).toLocaleString('fr-FR',{style:'currency',currency:'EUR'});
+            const todayStr = ()=> new Date().toISOString().slice(0,10);
+            const monthKey = d => (d instanceof Date ? d : new Date(d)).toISOString().slice(0,7);
+
+
+            const misc = {
+                ym: monthKey(new Date()),
+                fltAcc: 'ALL',
+                term: '',
+                catFilter: null
+            };
+
+            const ui = {
+                // forms
+                txForm: qs('#txForm'), txLabel: qs('#txLabel'), txDate: qs('#txDate'), txType: qs('#txType'),
+                txAmount: qs('#txAmount'), txAccount: qs('#txAccount'), txCat: qs('#txCat'), txNote: qs('#txNote'),
+                accForm: qs('#accForm'), accName: qs('#accName'), accInit: qs('#accInit'),
+                // filters
+                month: qs('#month'), fltAccount: qs('#fltAccount'), search: qs('#search'), chips: qs('#chips'),
+                // summary
+                sumOut: qs('#sumOut'), sumIn: qs('#sumIn'), sumNet: qs('#sumNet'), sumAll: qs('#sumAll'),
+                // areas
+                accounts: qs('#accounts'), budgets: qs('#budgets'), txList: qs('#txList'),
+                // io
+                btnExport: qs('#btnExport'), btnImport: qs('#btnImport'),
+            };
+
+            // Init static selects
+            ui.txCat.innerHTML = CATS.map(c=>`<option value="${escapeAttr(c)}">${escapeHtml(c)}</option>`).join('');
+
+            // Chips (catégories)
+            function renderChips(){
+                ui.chips.innerHTML = '';
+                const btnAll = chipButton('Toutes', misc.catFilter===null, ()=>{ misc.catFilter=null; render(); });
+                ui.chips.appendChild(btnAll);
+                CATS.forEach(cat=>{
+                    ui.chips.appendChild(chipButton(cat, misc.catFilter===cat, ()=>{
+                        misc.catFilter = misc.catFilter===cat ? null : cat;
+                        render();
+                    }));
+                });
+            }
+            function chipButton(lbl, active, onClick){
+                const b = document.createElement('button');
+                b.type='button'; b.className='chip'; b.textContent=lbl;
+                if(active) b.classList.add('active');
+                b.addEventListener('click', onClick);
+                return b;
+            }
+
+            // Forms
+            ui.txForm.addEventListener('submit', e=>{
+                e.preventDefault();
+                const label = ui.txLabel.value.trim(); if(!label) return;
+                const date = ui.txDate.value || todayStr();
+                const sign = ui.txType.value === '+' ? '+' : '-';
+                const amount = Math.abs(parseFloat(ui.txAmount.value||'0')) || 0;
+                const accountId = ui.txAccount.value;
+                const cat = ui.txCat.value || 'Autre';
+                const note = ui.txNote.value.trim() || null;
+                state.txns.push({
+                    id: crypto.randomUUID(),
+                    label, date, sign, amount, accountId, cat, note,
+                    createdAt: new Date().toISOString()
+                });
+                save();
+                ui.txForm.reset();
+                ui.txDate.value = date;
+                render();
+            });
+
+            ui.accForm.addEventListener('submit', e=>{
+                e.preventDefault();
+                const name = ui.accName.value.trim(); if(!name) return;
+                const initial = parseFloat(ui.accInit.value||'0')||0;
+                state.accounts.push({ id: crypto.randomUUID(), name, initial });
+                save();
+                ui.accForm.reset();
+                render();
+            });
+
+            // Filters + IO
+            ui.month.addEventListener('change', ()=>{ misc.ym = ui.month.value || misc.ym; render(); });
+            ui.fltAccount.addEventListener('change', ()=>{ misc.fltAcc = ui.fltAccount.value || 'ALL'; render(); });
+            ui.search.addEventListener('input', ()=>{ misc.term = ui.search.value.trim().toLowerCase(); render(); });
+
+            ui.btnExport.addEventListener('click', async ()=>{
+                const data = JSON.stringify(state, null, 2);
+                try{ await navigator.clipboard.writeText(data); alert('Export JSON copié ✅'); }
+                catch{ alert('Copie impossible.\n\n' + data); }
+            });
+            ui.btnImport.addEventListener('click', ()=>{
+                const data = prompt('Coller un JSON finance :', ''); if(!data) return;
+                try{
+                    const obj = JSON.parse(data);
+                    if(!obj || typeof obj!=='object') throw new Error();
+                    obj.accounts ||= [];
+                    obj.txns ||= [];
+                    obj.budgets ||= {};
+                    // Normalisation basique des ids
+                    obj.accounts.forEach(a=> a.id ||= crypto.randomUUID());
+                    obj.txns.forEach(t=> t.id ||= crypto.randomUUID());
+                    Object.assign(state, obj);
+                    save(); render();
+                }catch{ alert('Format invalide.'); }
+            });
+
+            // Délégation — Comptes
+            ui.accounts.addEventListener('click', e=>{
+                const row = e.target.closest('.acc[data-id]');
+                if(!row) return;
+                const id = row.dataset.id;
+                const actBtn = e.target.closest('[data-action]');
+                if(!actBtn) return;
+                const action = actBtn.dataset.action;
+                if(action==='rename'){
+                    const acc = state.accounts.find(a=>a.id===id); if(!acc) return;
+                    const nv = prompt('Renommer le compte :', acc.name);
+                    if(!nv) return;
+                    acc.name = nv.trim();
+                    save(); render();
+                }else if(action==='delete'){
+                    const hasTx = state.txns.some(t=>t.accountId===id);
+                    const msg = hasTx
+                        ? 'Ce compte a des transactions. Le supprimer retirera aussi ses transactions.\nContinuer ?'
+                        : 'Supprimer ce compte ?';
+                    if(!confirm(msg)) return;
+                    state.accounts = state.accounts.filter(a=>a.id!==id);
+                    if(hasTx) state.txns = state.txns.filter(t=>t.accountId!==id);
+                    // Si le filtre était ce compte, revenir à ALL
+                    if(misc.fltAcc===id) misc.fltAcc='ALL';
+                    // Si aucune compte restant, en recréer un par défaut
+                    if(state.accounts.length===0){
+                        state.accounts.push({ id: crypto.randomUUID(), name:'Compte courant', initial:0 });
+                    }
+                    save(); render();
+                }
+            });
+
+            // Délégation — Budgets
+            ui.budgets.addEventListener('input', e=>{
+                const inp = e.target.closest('input[data-cat]');
+                if(!inp) return;
+                const cat = inp.dataset.cat;
+                const plan = Math.max(0, parseFloat(inp.value||'0')||0);
+                state.budgets[misc.ym] ||= {};
+                state.budgets[misc.ym][cat] = plan;
+                save();
+                renderSummary(); // met à jour le net si besoin visuel
+                renderBudgets(); // pour la barre
+            });
+
+            // Délégation — Transactions
+            ui.txList.addEventListener('click', e=>{
+                const row = e.target.closest('.tx[data-id]');
+                if(!row) return;
+                const id = row.dataset.id;
+                const actBtn = e.target.closest('[data-action]');
+                if(!actBtn) return;
+                const action = actBtn.dataset.action;
+                const tx = state.txns.find(t=>t.id===id); if(!tx) return;
+
+                if(action==='delete'){
+                    if(!confirm('Supprimer cette transaction ?')) return;
+                    state.txns = state.txns.filter(t=>t.id!==id);
+                    save(); render();
+                }else if(action==='edit'){
+                    const label = prompt('Libellé :', tx.label) ?? tx.label;
+                    const date = prompt('Date (YYYY-MM-DD) :', tx.date) ?? tx.date;
+                    const sign = prompt('Type (+ ou -) :', tx.sign) ?? tx.sign;
+                    const amountStr = prompt('Montant :', String(tx.amount)) ?? String(tx.amount);
+                    const cat = prompt('Catégorie :', tx.cat) ?? tx.cat;
+                    const note = prompt('Note (optionnel) :', tx.note||'') ?? (tx.note||'');
+                    const accountId = prompt('Id compte (laissez pour inchangé) :', tx.accountId) ?? tx.accountId;
+
+                    const amt = Math.abs(parseFloat(amountStr||'0'))||0;
+                    tx.label = String(label).trim()||tx.label;
+                    tx.date = validDate(date) ? date : tx.date;
+                    tx.sign = sign==='+'?'+':'-';
+                    tx.amount = amt;
+                    tx.cat = String(cat).trim()||tx.cat;
+                    tx.note = note.trim()? note.trim(): null;
+                    if(state.accounts.some(a=>a.id===accountId)) tx.accountId = accountId;
+                    save(); render();
+                }
+            });
+
+            // Render
+            function render(){
+                // Defaults UI
+                ui.month.value = misc.ym;
+                ui.txDate.value ||= todayStr();
+
+                // Selects
+                ui.txAccount.innerHTML = state.accounts.map(a=>`<option value="${escapeAttr(a.id)}">${escapeHtml(a.name)}</option>`).join('');
+                ui.fltAccount.innerHTML = `<option value="ALL">Tous les comptes</option>` + state.accounts.map(a=>`<option value="${escapeAttr(a.id)}">${escapeHtml(a.name)}</option>`).join('');
+                ui.fltAccount.value = misc.fltAcc;
+                renderChips();
+
+                renderAccounts();
+                renderBudgets();
+                renderTxns();
+                renderSummary();
+            }
+
+            function renderAccounts(){
+                ui.accounts.innerHTML = '';
+                const balances = computeBalances();
+                state.accounts.forEach(a=>{
+                    const bal = balances[a.id] ?? a.initial;
+                    const el = document.createElement('div');
+                    el.className = 'acc';
+                    el.dataset.id = a.id;
+                    el.innerHTML = `
+        <div>
+          <h4>${escapeHtml(a.name)}</h4>
+          <small>Initial : ${eur(a.initial)}</small>
+        </div>
+        <div class="acc-inline">
+          <strong>${eur(bal)}</strong>
+          <button class="icon-btn btn btn-ghost" title="Renommer" data-action="rename">✏️</button>
+          <button class="icon-btn btn btn-ghost" title="Supprimer" data-action="delete">🗑️</button>
+        </div>
+      `;
+                    ui.accounts.appendChild(el);
+                });
+                // Solde total comptes
+                const total = Object.values(computeBalances()).reduce((s,n)=>s+n,0);
+                ui.sumAll.textContent = eur(total);
+            }
+
+            function renderBudgets(){
+                ui.budgets.innerHTML = '';
+                const map = state.budgets[misc.ym] || {};
+                const spentByCat = spendOutByCat(misc.ym);
+                CATS.forEach(cat=>{
+                    const planned = Number(map[cat]||0);
+                    const spent = Math.abs(Number(spentByCat[cat]||0));
+                    const ratio = planned>0 ? Math.min(1, spent/planned) : (spent>0 ? 1 : 0);
+                    const row = document.createElement('div');
+                    row.className = 'bud-row';
+                    row.innerHTML = `
+        <div>${escapeHtml(cat)}</div>
+        <div><input type="number" step="0.01" min="0" value="${planned}" data-cat="${escapeAttr(cat)}" /></div>
+        <div>
+          <div class="bud-bar" title="Utilisé : ${eur(spent)} / ${eur(planned)}">
+            <span style="width:${(ratio*100).toFixed(0)}%"></span>
+          </div>
+        </div>
+      `;
+                    ui.budgets.appendChild(row);
+                });
+            }
+
+            function renderTxns(){
+                ui.txList.innerHTML = '';
+                const items = filteredTxns();
+                if(!items.length){
+                    ui.txList.innerHTML = `<div class="muted">Aucune transaction pour ce filtre.</div>`;
+                    return;
+                }
+                items.sort((a,b)=> a.date===b.date
+                    ? (b.createdAt||'').localeCompare(a.createdAt||'')
+                    : b.date.localeCompare(a.date)
+                );
+
+                const accById = Object.fromEntries(state.accounts.map(a=>[a.id,a]));
+                items.forEach(tx=>{
+                    const el = document.createElement('div');
+                    el.className='tx';
+                    el.dataset.id = tx.id;
+                    const accName = accById[tx.accountId]?.name || '—';
+                    const amt = (tx.sign==='+'? 1 : -1) * tx.amount;
+                    const cls = amt>=0 ? 'pos' : 'neg';
+                    el.innerHTML = `
+        <div>
+          <div><strong>${escapeHtml(tx.label)}</strong></div>
+          <div class="muted">
+            ${escapeHtml(tx.date)} • ${escapeHtml(accName)} • <span class="chip">${escapeHtml(tx.cat)}</span>
+            ${tx.note? ` • ${escapeHtml(tx.note)}`:''}
+          </div>
+        </div>
+        <div class="tx-amt ${cls}">${amt>=0?'+':''}${eur(Math.abs(amt))}</div>
+        <div>
+          <button class="icon-btn btn btn-ghost" title="Modifier" data-action="edit">✏️</button>
+          <button class="icon-btn btn btn-ghost" title="Supprimer" data-action="delete">🗑️</button>
+        </div>
+      `;
+                    ui.txList.appendChild(el);
+                });
+            }
+
+            function renderSummary(){
+                const items = state.txns.filter(t=>monthKey(t.date)===misc.ym);
+                const sumOut = items.filter(t=>t.sign==='-').reduce((s,t)=>s+t.amount,0);
+                const sumIn = items.filter(t=>t.sign==='+').reduce((s,t)=>s+t.amount,0);
+                ui.sumOut.textContent = eur(sumOut);
+                ui.sumIn.textContent = eur(sumIn);
+                ui.sumNet.textContent = eur(sumIn - sumOut);
+            }
+
+            // Helpers
+            function filteredTxns(){
+                return state.txns.filter(t=>{
+                    if(monthKey(t.date)!==misc.ym) return false;
+                    if(misc.fltAcc!=='ALL' && t.accountId!==misc.fltAcc) return false;
+                    if(misc.catFilter && t.cat!==misc.catFilter) return false;
+                    if(misc.term){
+                        const hay = `${t.label} ${t.note||''} ${t.cat}`.toLowerCase();
+                        if(!hay.includes(misc.term)) return false;
+                    }
+                    return true;
+                });
+            }
+            function computeBalances(){
+                const bal = Object.fromEntries(state.accounts.map(a=>[a.id, Number(a.initial)||0]));
+                state.txns.forEach(t=>{
+                    const s = t.sign==='+'? 1 : -1;
+                    if(bal[t.accountId]==null) bal[t.accountId]=0;
+                    bal[t.accountId] += s * (Number(t.amount)||0);
+                });
+                return bal;
+            }
+            function spendOutByCat(ym){
+                const out = {};
+                state.txns.forEach(t=>{
+                    if(t.sign==='-' && monthKey(t.date)===ym){
+                        out[t.cat] = (out[t.cat]||0) + (Number(t.amount)||0);
+                    }
+                });
+                return out;
+            }
+            function validDate(s){
+                return /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(new Date(s).getTime());
+            }
+
+
+            async function apiLoad(ns){
+                const r = await fetch(`/api/userdata/${encodeURIComponent(ns)}`, { credentials: 'same-origin' });
+                if(!r.ok) throw new Error('Load failed'); return (await r.json()).state;
+            }
+            async function apiSave(ns, state){
+                const r = await fetch(`/api/userdata/${encodeURIComponent(ns)}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type':'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ state })
+                });
+                if(!r.ok){
+                    const text = await r.text().catch(()=> '');
+                    throw new Error('Save failed: ' + (text || r.status));
+                }
+            }
+            let state = null;
+            async function load(){ try{ return await apiLoad('finance'); }catch{ return null; } }
+            function save(){ apiSave('finance', state).catch(e=>{ console.error(e); alert('Erreur de sauvegarde Finance. Vérifiez la connexion puis réessayez.'); }); }
+
+            function escapeHtml(s){ return (s??'').toString().replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
+            function escapeAttr(s){ return (s??'').toString().replace(/"/g,'&quot;'); }
+
+            (async () => {
+                // état par défaut
+                const defaults = {
+                    accounts: [{ id: crypto.randomUUID(), name: 'Compte courant', initial: 0 }],
+                    txns: [],
+                    budgets: {}
+                };
+                state = { ...defaults };
+                try{
+                    let loaded = await apiLoad('finance');
+                    // Si le serveur renvoie un tableau (ex: '[]'), ignorer et réécrire des defaults
+                    if (!loaded || Array.isArray(loaded) || typeof loaded !== 'object') {
+                        await apiSave('finance', state).catch(console.error);
+                    } else {
+                        // Normalisation minimale
+                        loaded.accounts ||= [];
+                        loaded.txns ||= [];
+                        loaded.budgets ||= {};
+                        // ids manquants
+                        loaded.accounts.forEach(a => a.id ||= crypto.randomUUID());
+                        loaded.txns.forEach(t => t.id ||= crypto.randomUUID());
+                        state = loaded;
+                    }
+                }catch(e){ console.warn('Finance: aucun état distant, utilisation des valeurs par défaut.'); }
+                ui.month.value = misc.ym;
+                ui.fltAccount.value = misc.fltAcc;
+                ui.txDate.value = todayStr();
+                render();
+            })()
+            render();
+        })();
+    </script>
+{% endblock %}

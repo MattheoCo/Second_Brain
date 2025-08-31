@@ -1,0 +1,89 @@
+{# templates/registration/register.html.twig #}
+{% extends 'base.html.twig' %}
+
+{% block title %}Inscription{% endblock %}
+
+{% block body %}
+    <main class="auth">
+        <section class="auth-wrap">
+            <div class="card">
+                <h1 class="title">Créer un compte</h1>
+                <p class="subtitle">Rejoignez-nous pour accéder à toutes les fonctionnalités.</p>
+
+                {{ form_errors(registrationForm) }}
+
+                {{ form_start(registrationForm, {
+                    attr: { class: 'form', autocomplete: 'on' }
+                }) }}
+
+                    <div class="form-row">
+                        <label for="registration_form_email">Email</label>
+                        {{ form_widget(registrationForm.email, {
+                            'attr': {
+                                'id': 'registration_form_email',
+                                'autocomplete': 'email'
+                            }
+                        }) }}
+                    </div>
+
+                    <div class="form-row">
+                        <label for="registration_form_plainPassword">Mot de passe</label>
+                        {{ form_widget(registrationForm.plainPassword, {
+                            'attr': {
+                                'id': 'registration_form_plainPassword',
+                                'autocomplete': 'new-password'
+                            }
+                        }) }}
+                    </div>
+
+                    <div class="form-row checkbox">
+                        {{ form_widget(registrationForm.agreeTerms) }}
+                        <label for="{{ registrationForm.agreeTerms.vars.id }}">J'accepte les conditions d'utilisation</label>
+                    </div>
+
+                    <button class="btn btn-primary btn-lg" type="submit">S'inscrire</button>
+
+                {{ form_end(registrationForm) }}
+
+                <div class="alt">
+                    <span>Déjà inscrit ?</span>
+                    <a class="link" href="{{ path('app_login') }}">Se connecter</a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <style>
+        :root{
+            --bg:#0b1020; --fg:#e8eefc; --muted:rgba(232,238,252,.75);
+            --card:rgba(255,255,255,.06); --stroke:rgba(255,255,255,.12);
+            --primary:#2563eb; --danger:#ef4444;
+        }
+        .auth{min-height:100dvh;background:var(--bg);color:var(--fg);display:grid;place-items:center;padding:2rem}
+        .auth-wrap{width:100%;max-width:420px}
+        .card{background:var(--card);border:1px solid var(--stroke);border-radius:18px;padding:1.4rem 1.2rem 1.2rem;backdrop-filter:blur(8px)}
+        .title{margin:0 0 .25rem;font-weight:900;font-size:1.6rem}
+        .subtitle{margin:0 0 1rem;color:var(--muted)}
+        .alert{background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.35);color:#fecaca;padding:.6rem .8rem;border-radius:12px;margin:.4rem 0 1rem}
+        .info{background:rgba(37,99,235,.15);border:1px solid rgba(37,99,235,.35);color:#dbeafe;padding:.6rem .8rem;border-radius:12px;margin:.4rem 0 1rem}
+        .form{display:grid;gap:.85rem;margin:.6rem 0 1.1rem}
+        .form-row label{display:block;font-size:.9rem;margin:0 0 .35rem;color:var(--muted)}
+        .form-row input[type="email"],
+        .form-row input[type="password"]{width:100%;background:rgba(255,255,255,.06);border:1px solid var(--stroke);
+            color:var(--fg);padding:.75rem .9rem;border-radius:12px;outline:none}
+        .form-row input:focus{border-color:rgba(37,99,235,.6)}
+        .form-row.checkbox{display:flex;align-items:center;gap:.55rem}
+        .form-row.checkbox label{margin:0}
+        .btn{display:inline-flex;justify-content:center;align-items:center;border-radius:12px;border:1px solid var(--stroke);font-weight:800}
+        .btn-lg{padding:.85rem 1.1rem;width:100%}
+        .btn-primary{background:var(--primary);color:#fff}
+        .btn-primary:hover{filter:brightness(1.05)}
+        .alt{margin-top:.8rem;display:flex;gap:.5rem;justify-content:center;color:var(--muted)}
+        .link{color:#93c5fd;text-decoration:none}
+        .link:hover{text-decoration:underline}
+        .cta-inline{display:flex;justify-content:center}
+        /* Style des erreurs de formulaire */
+        .form-error-message{color:#fca5a5;font-size:.8rem;margin-top:.3rem}
+        .invalid-feedback{color:#fca5a5;font-size:.8rem;margin-top:.3rem}
+    </style>
+{% endblock %}

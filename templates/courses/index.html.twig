@@ -1,0 +1,37 @@
+{% extends 'base.html.twig' %}
+{% block title %}Cours{% endblock %}
+{% block body %}
+    <header style="display:flex; align-items:center; gap:.6rem;">
+        <h1 class="page-title" style="margin:0; flex:1 1 auto;">Cours</h1>
+        <div class="page-actions">
+            <a href="{{ path('app_course_new') }}" class="btn">➕ Nouveau cours</a>
+        </div>
+    </header>
+
+    <div class="page-actions" style="margin-bottom:.6rem;">
+        <a href="{{ path('app_dashboard') }}" class="btn btn-ghost">⟵ Retour au menu</a>
+    </div>
+
+    {% if courses is empty %}
+        <div class="card">
+            <div class="card-title">Aucun cours</div>
+            <p class="muted">Crée ton premier cours pour commencer à saisir des notes.</p>
+            <div class="form-actions">
+                <a href="{{ path('app_course_new') }}" class="btn">Créer un cours</a>
+            </div>
+        </div>
+    {% else %}
+        <div class="grid">
+            {% for course in courses %}
+                <a class="card stretched" href="{{ path('app_course_show', {id: course.id}) }}">
+                    <div class="card-title">{{ course.name }}</div>
+                    <div class="kpis">
+                        {% if course.code %}<span class="badge badge-muted">Code : {{ course.code }}</span>{% endif %}
+                        <span class="badge badge-blue">Moy. : {{ course.averageScore is defined ? course.averageScore : (course.getAverageScore() ?? '—') }}</span>
+                        <span class="badge badge-green">{{ course.grades|length }} note{{ course.grades|length > 1 ? 's' : '' }}</span>
+                    </div>
+                </a>
+            {% endfor %}
+        </div>
+    {% endif %}
+{% endblock %}

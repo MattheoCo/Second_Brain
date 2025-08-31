@@ -1,0 +1,334 @@
+{% extends 'base.html.twig' %}
+{% block title %}{{ title|default('Agenda') }}{% endblock %}
+
+{% block body %}
+    <header class="ag-header">
+        <h1 class="page-title">Agenda</h1>
+        <div class="toolbar">
+            <button id="btnExport" class="btn btn-ghost">📤 Exporter</button>
+            <button id="btnImport" class="btn btn-ghost">📥 Importer</button>
+        </div>
+    </header>
+
+    <div class="page-actions" style="margin-bottom:.6rem;">
+        <a href="{{ path('app_dashboard') }}" class="btn btn-ghost">⟵ Retour au menu</a>
+    </div>
+
+    <section class="card" style="margin:.8rem 0;">
+        <form id="evtForm" class="ag-add" autocomplete="off">
+            <input id="evtTitle" type="text" placeholder="Titre de l’événement" required />
+            <input id="evtDate" type="date" required />
+            <input id="evtTime" type="time" />
+            <select id="evtCat" aria-label="Catégorie"></select>
+            <input id="evtNote" type="text" placeholder="Note (optionnel)" />
+            <button class="btn" type="submit">Ajouter</button>
+        </form>
+
+        <div class="ag-helpers">
+            <div class="nav">
+                <button id="btnPrev" type="button" class="btn btn-ghost" title="Mois précédent">◀</button>
+                <input id="month" type="month" />
+                <button id="btnNext" type="button" class="btn btn-ghost" title="Mois suivant">▶</button>
+                <button id="btnToday" type="button" class="btn btn-ghost" title="Aujourd’hui">Aujourd’hui</button>
+            </div>
+            <div class="tools">
+                <input id="search" type="search" placeholder="Rechercher…" />
+                <label class="toggle">
+                    <input id="toggleList" type="checkbox" />
+                    <span>Vue liste</span>
+                </label>
+            </div>
+        </div>
+
+        <div id="chips" class="chips" aria-label="Filtrer par catégorie"></div>
+    </section>
+
+    <section id="agApp" class="card ag-app">
+        <header class="section-head">
+            <div class="section-title" id="monthLabel">Mois</div>
+        </header>
+
+        <div id="calendar" class="cal">
+            <div class="cal-head">
+                <div>Lun</div><div>Mar</div><div>Mer</div><div>Jeu</div><div>Ven</div><div>Sam</div><div>Dim</div>
+            </div>
+            <div class="cal-grid" id="calGrid"></div>
+        </div>
+
+        <div id="listView" class="list" hidden></div>
+    </section>
+
+    <style>
+        .ag-header{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+        .ag-header .page-title{margin:0;flex:1 1 auto}
+        .toolbar{display:flex;gap:.4rem;flex:0 0 auto}
+
+        .ag-add{display:grid;gap:.5rem;grid-template-columns:1fr}
+        .ag-add input,.ag-add select,.tools input[type="search"]{
+            width:100%;padding:.6rem .7rem;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:var(--bg-soft);color:var(--text)
+        }
+        .ag-add .btn{width:100%}
+        @media(min-width:900px){
+            .ag-add{grid-template-columns:1.6fr 1fr .8fr 1fr 1.4fr auto;align-items:start}
+            .ag-add .btn{width:auto}
+        }
+
+        .ag-helpers{display:flex;gap:.8rem;align-items:center;justify-content:space-between;margin-top:.6rem;flex-wrap:wrap}
+        .nav{display:flex;gap:.4rem;align-items:center;flex-wrap:wrap}
+        .tools{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap}
+        .toggle{display:inline-flex;gap:.35rem;align-items:center;font-weight:700}
+
+        .chips{display:flex;gap:.35rem;flex-wrap:wrap;margin-top:.6rem}
+        @media(max-width:719.98px){.chips{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:.2rem}.chip{flex:0 0 auto}}
+        .chip{padding:.25rem .55rem;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.08);font-weight:700;cursor:pointer;white-space:nowrap}
+        .chip.active{background:rgba(37,99,235,.22);border-color:rgba(37,99,235,.45)}
+
+        .ag-app{overflow-x:auto;overflow-y:visible}
+        .cal{min-width:720px}
+        .cal-head{display:grid;grid-template-columns:repeat(7,1fr);gap:.2rem;padding:.6rem .6rem .2rem .6rem;color:rgba(255,255,255,.78);font-weight:800;position:sticky;top:0;background:var(--card)}
+        .cal-grid{display:grid;grid-template-columns:repeat(7,minmax(100px,1fr));gap:.35rem;padding:.2rem .6rem .8rem}
+
+        .day{min-height:clamp(96px,14vh,160px);border:1px solid rgba(255,255,255,.10);border-radius:12px;background:var(--bg-soft);display:flex;flex-direction:column}
+        .day-head{display:flex;align-items:center;justify-content:space-between;gap:.4rem;padding:.35rem .45rem;border-bottom:1px dashed rgba(255,255,255,.08)}
+        .day-num{font-weight:900}
+        .day.today .day-num{color:#60a5fa}
+        .day.out{opacity:.55}
+        .day-body{display:flex;flex-direction:column;gap:.25rem;padding:.4rem .45rem .55rem;flex:1 1 auto;min-height:0}
+        .evt{display:flex;align-items:center;gap:.35rem;padding:.25rem .45rem;border-radius:10px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12)}
+        .evt .dot{width:10px;height:10px;border-radius:999px;flex:0 0 10px}
+        .evt .ttl{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .evt .time{color:rgba(255,255,255,.78);font-weight:800}
+        .evt .del{width:28px;height:28px}
+
+        .list{display:grid;gap:.4rem;padding:.6rem}
+        .row{display:grid;grid-template-columns:auto 1fr auto auto auto;gap:.6rem;align-items:center;border-bottom:1px dashed rgba(255,255,255,.12);padding:.35rem 0}
+        .row .badge{padding:.05rem .45rem;border-radius:999px;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.16);font-weight:800;font-size:.78rem}
+
+        @media(max-width:540px){
+            .row{grid-template-columns:1fr auto;gap:.4rem}
+            .row > :nth-child(1){order:1}
+            .row > :nth-child(2){order:2}
+            .row > :nth-child(3){order:3}
+            .row > :nth-child(4){order:4}
+            .row > :nth-child(5){order:5}
+        }
+    </style>
+
+    <script>
+        {% include '_partials/userdata_api.js' %}
+        (() => {
+            const STORAGE_KEY = 'agenda:v1';
+            const CATS = ['Perso','Travail','Famille','Santé','Loisirs','Voyage','Autre'];
+            const CAT_COLORS = {'Perso':'#3b82f6','Travail':'#10b981','Famille':'#f59e0b','Santé':'#ef4444','Loisirs':'#8b5cf6','Voyage':'#06b6d4','Autre':'#9ca3af'};
+
+            const qs = (s,r=document)=>r.querySelector(s);
+            const todayStr = ()=> new Date().toISOString().slice(0,10);
+            const monthKey = d => (d instanceof Date ? d : new Date(d)).toISOString().slice(0,7);
+            const pad = n => n.toString().padStart(2,'0');
+            const toDate = s => new Date(s+'T00:00:00');
+
+            let state = null; // { events: [...] }
+            async function load(){ try{ return await apiLoad('agenda'); }catch{ return null; } }
+            function save(){ apiSave('agenda', state).catch(console.error); }
+            const misc = { currentMonth: monthKey(new Date()), term: '', catFilter: null, listView: false };
+
+            const ui = {
+                month: qs('#month'), monthLabel: qs('#monthLabel'),
+                btnPrev: qs('#btnPrev'), btnNext: qs('#btnNext'), btnToday: qs('#btnToday'),
+                chips: qs('#chips'), search: qs('#search'), toggleList: qs('#toggleList'),
+                calGrid: qs('#calGrid'), calendar: qs('#calendar'), listView: qs('#listView'),
+                evtForm: qs('#evtForm'), evtTitle: qs('#evtTitle'), evtDate: qs('#evtDate'),
+                evtTime: qs('#evtTime'), evtCat: qs('#evtCat'), evtNote: qs('#evtNote'),
+                btnExport: qs('#btnExport'), btnImport: qs('#btnImport'),
+            };
+
+            ui.evtCat.innerHTML = CATS.map(c=>`<option value="${c}">${c}</option>`).join('');
+
+            function renderChips(){
+                ui.chips.innerHTML = '';
+                CATS.forEach(cat=>{
+                    const b = document.createElement('button');
+                    b.type='button'; b.className='chip'; b.textContent = cat;
+                    b.classList.toggle('active', misc.catFilter===cat);
+                    b.addEventListener('click', ()=>{ misc.catFilter = misc.catFilter===cat?null:cat; render(); });
+                    ui.chips.appendChild(b);
+                });
+            }
+
+            ui.evtForm.addEventListener('submit', e=>{
+                e.preventDefault();
+                const title = ui.evtTitle.value.trim(); if(!title) return;
+                const date = ui.evtDate.value || todayStr();
+                const it = {
+                    id: crypto.randomUUID(), title, date,
+                    time: ui.evtTime.value || null, cat: ui.evtCat.value || 'Autre',
+                    note: ui.evtNote.value.trim() || null
+                };
+                state.events.push(it); save(); ui.evtForm.reset(); ui.evtDate.value = date; render();
+            });
+
+            ui.btnExport.addEventListener('click', async ()=>{
+                const data = JSON.stringify(state.events, null, 2);
+                try{ await navigator.clipboard.writeText(data); alert('Export JSON copié ✅'); }
+                catch{ alert('Copie impossible.\n\n' + data); }
+            });
+            ui.btnImport.addEventListener('click', ()=>{
+                const data = prompt('Coller un JSON d’événements :', ''); if(!data) return;
+                try{
+                    const arr = JSON.parse(data); if(!Array.isArray(arr)) throw new Error();
+                    arr.forEach(e=>e.id ||= crypto.randomUUID());
+                    state.events = arr; save(); render();
+                }catch{ alert('Format invalide.'); }
+            });
+
+            ui.month.addEventListener('change', ()=>{ misc.currentMonth = ui.month.value || misc.currentMonth; render(); });
+            ui.btnPrev.addEventListener('click', e => { e.preventDefault(); misc.currentMonth = addMonths(misc.currentMonth, -1); render(); });
+            ui.btnNext.addEventListener('click', e => { e.preventDefault(); misc.currentMonth = addMonths(misc.currentMonth, 1); render(); });
+            ui.btnToday.addEventListener('click', e => { e.preventDefault(); misc.currentMonth = monthKey(new Date()); render(); });
+            ui.search.addEventListener('input', ()=>{ misc.term = ui.search.value.trim().toLowerCase(); render(); });
+            ui.toggleList.addEventListener('change', ()=>{ misc.listView = ui.toggleList.checked; render(); });
+
+            function render(){
+                ui.month.value = misc.currentMonth;
+                ui.toggleList.checked = misc.listView;
+                ui.evtDate.value ||= todayStr();
+                renderChips();
+                const label = new Date(misc.currentMonth + '-01').toLocaleDateString('fr-FR', { month:'long', year:'numeric' });
+                ui.monthLabel.textContent = label.charAt(0).toUpperCase() + label.slice(1);
+                ui.calendar.hidden = !!misc.listView;
+                ui.listView.hidden = !misc.listView;
+                if(misc.listView) renderList(); else renderCalendar();
+            }
+
+            function renderCalendar(){
+                ui.calGrid.innerHTML = '';
+                const { days } = monthMatrix(misc.currentMonth);
+                days.forEach(d=>{
+                    const cell = document.createElement('div');
+                    cell.className = 'day' + (d.isToday?' today':'') + (d.inMonth?'':' out');
+                    cell.innerHTML = `
+        <div class="day-head">
+          <div class="day-num">${d.date.getDate()}</div>
+          <button type="button" class="btn btn-ghost" title="Ajouter ici">＋</button>
+        </div>
+        <div class="day-body"></div>
+      `;
+                    const body = cell.querySelector('.day-body');
+                    const dateStr = fmtDate(d.date);
+                    const items = eventsOn(dateStr);
+                    if(items.length){
+                        items.sort(byDateTime);
+                        items.forEach(ev=> body.appendChild(eventPill(ev)));
+                    }
+                    cell.querySelector('button').addEventListener('click', ()=>{
+                        ui.evtDate.value = dateStr; ui.evtTitle.focus();
+                    });
+                    ui.calGrid.appendChild(cell);
+                });
+            }
+
+            function renderList(){
+                const list = filtered(eventsMonth());
+                ui.listView.innerHTML = '';
+                if(!list.length){
+                    ui.listView.innerHTML = `<div class="muted" style="padding:.8rem;">Aucun événement pour ce filtre.</div>`;
+                    return;
+                }
+                list.sort(byDateTime);
+                list.forEach(ev=>{
+                    const row = document.createElement('div');
+                    row.className = 'row';
+                    row.innerHTML = `
+        <div class="dot" style="width:10px;height:10px;border-radius:999px;background:${catColor(ev.cat)}"></div>
+        <div><strong>${escapeHtml(ev.title)}</strong>${ev.note?`<div class="muted">${escapeHtml(ev.note)}</div>`:''}</div>
+        <div class="muted">${fmtHuman(ev.date, ev.time)}</div>
+        <div><span class="badge">${escapeHtml(ev.cat)}</span></div>
+        <div><button class="icon-btn del" title="Supprimer">🗑️</button></div>
+      `;
+                    row.querySelector('.del').addEventListener('click', ()=> removeEvent(ev.id));
+                    ui.listView.appendChild(row);
+                });
+            }
+
+            function eventPill(ev){
+                const el = document.createElement('div');
+                el.className = 'evt';
+                el.innerHTML = `
+      <span class="dot" style="background:${catColor(ev.cat)}"></span>
+      <span class="time">${ev.time? escapeHtml(ev.time): '—'}</span>
+      <span class="ttl" title="${escapeAttr(ev.title)}">${escapeHtml(ev.title)}</span>
+      <button class="icon-btn del" title="Supprimer">🗑️</button>
+    `;
+                el.querySelector('.del').addEventListener('click', ()=> removeEvent(ev.id));
+                return el;
+            }
+
+            function eventsMonth(){ return state.events.filter(e=>monthKey(e.date)===misc.currentMonth); }
+            function eventsOn(dateStr){ return filtered(state.events.filter(e=>e.date===dateStr)); }
+            function filtered(arr){
+                return arr.filter(e=>{
+                    if(misc.catFilter && e.cat!==misc.catFilter) return false;
+                    if(misc.term){
+                        const hay = `${e.title} ${e.note||''} ${e.cat}`.toLowerCase();
+                        if(!hay.includes(misc.term)) return false;
+                    }
+                    return true;
+                });
+            }
+            function removeEvent(id){
+                if(!confirm('Supprimer cet événement ?')) return;
+                state.events = state.events.filter(e=>e.id!==id); save(); render();
+            }
+
+            function monthMatrix(ym){
+                const [y,m] = ym.split('-').map(Number);
+                const first = new Date(y, m-1, 1);
+                const last = new Date(y, m, 0);
+                const startOffset = (first.getDay()+6)%7; // Lundi=0
+                const total = startOffset + last.getDate();
+                const grid = Math.ceil(total/7)*7;
+                const days = [];
+                for(let i=0;i<grid;i++){
+                    const d = new Date(y, m-1, 1 - startOffset + i);
+                    days.push({ date: d, inMonth: d.getMonth()===first.getMonth(), isToday: fmtDate(d)===todayStr() });
+                }
+                return { days };
+            }
+            function addMonths(ym, delta){
+                const [y,m] = ym.split('-').map(Number);
+                const d = new Date(y, m-1+delta, 1);
+                return d.toISOString().slice(0,7);
+            }
+            function fmtDate(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+            function fmtHuman(dateStr, time){
+                const d = toDate(dateStr);
+                const ds = d.toLocaleDateString('fr-FR', { weekday:'short', day:'2-digit', month:'short', year:'numeric' });
+                return `${ds}${time? ' • '+time:''}`;
+            }
+            function byDateTime(a,b){
+                if(a.date===b.date){
+                    const ta = a.time || '99:99', tb = b.time || '99:99';
+                    return ta<tb?-1:ta>tb?1:0;
+                }
+                return a.date<b.date?-1:1;
+            }
+            function catColor(cat){ return CAT_COLORS[cat] || '#9ca3af'; }
+
+            function escapeHtml(s){ return (s??'').toString().replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
+            function escapeAttr(s){ return (s??'').toString().replace(/"/g,'&quot;'); }
+
+            (async () => {
+                state = { events: [] };
+                try{
+                    const loaded = await apiLoad('agenda');
+                    if (loaded && typeof loaded === 'object') {
+                        loaded.events ||= [];
+                        loaded.events.forEach(e => e.id ||= crypto.randomUUID());
+                        state = loaded;
+                    }
+                }catch(e){ console.warn('Agenda: aucun état distant, utilisation des valeurs par défaut.'); }
+                render();
+            })();
+        })();
+    </script>
+{% endblock %}

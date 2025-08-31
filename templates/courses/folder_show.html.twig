@@ -1,0 +1,56 @@
+{% extends 'base.html.twig' %}
+{% block title %}Dossier: {{ folder.name }}{% endblock %}
+
+{% block body %}
+    <header style="display:flex;align-items:center;gap:.5rem;">
+        <a href="{{ folder.parent ? path('app_course_folder_show', {id: folder.parent.id}) : path('app_courses') }}">⬅️ Remonter</a>
+        <h1 class="page-title" style="margin:0;flex:1 1 auto;">📁 {{ folder.name }}</h1>
+        <form method="post" action="{{ path('app_course_folder_delete', {id: folder.id}) }}" onsubmit="return confirm('Supprimer ce dossier ?');">
+            <input type="hidden" name="_token" value="{{ csrf_token('delete_folder_' ~ folder.id) }}">
+            <button class="icon-btn" title="Supprimer le dossier" aria-label="Supprimer le dossier">🗑️</button>
+        </form>
+    </header>
+
+    <p style="display:flex; gap:.5rem; flex-wrap:wrap;">
+        <a href="{{ path('app_course_folder_new', { parent: folder.id }) }}" class="btn">+ Nouveau sous-dossier</a>
+        <a href="{{ path('app_course_new', { folder: folder.id }) }}" class="btn">+ Nouveau cours</a>
+    </p>
+
+    <h2>Sous-dossiers</h2>
+    {% if children is empty %}
+        <p class="muted">Aucun sous-dossier.</p>
+    {% else %}
+        <ul class="list">
+            {% for f in children %}
+                <li style="display:flex;align-items:center;gap:.5rem;">
+                    <a href="{{ path('app_course_folder_show', {id: f.id}) }}" style="flex:1 1 auto;">📁 {{ f.name }}</a>
+                    <form method="post" action="{{ path('app_course_folder_delete', {id: f.id}) }}" onsubmit="return confirm('Supprimer ce dossier ?');">
+                        <input type="hidden" name="_token" value="{{ csrf_token('delete_folder_' ~ f.id) }}">
+                        <button class="icon-btn" title="Supprimer le dossier" aria-label="Supprimer le dossier">🗑️</button>
+                    </form>
+                    <a href="{{ path('app_course_folder_new', { parent: f.id }) }}" class="icon-btn" title="Nouveau sous-dossier">➕</a>
+                    <a href="{{ path('app_course_new', { folder: f.id }) }}" class="icon-btn" title="Nouveau cours">📄+</a>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    <h2>Cours dans ce dossier</h2>
+    {% if courses is empty %}
+        <p class="muted">Aucun cours.</p>
+    {% else %}
+        <ul class="list">
+            {% for course in courses %}
+                <li style="display:flex;align-items:center;gap:.5rem;">
+                    <a href="{{ path('app_course_show', {id: course.id}) }}" style="flex:1 1 auto;">
+                        {{ course.name }}{% if course.code %} <span class="muted">({{ course.code }})</span>{% endif %}
+                    </a>
+                    <form method="post" action="{{ path('app_course_delete', {id: course.id}) }}" onsubmit="return confirm('Supprimer ce cours ?');">
+                        <input type="hidden" name="_token" value="{{ csrf_token('delete_course_' ~ course.id) }}">
+                        <button class="icon-btn" title="Supprimer" aria-label="Supprimer le cours">🗑️</button>
+                    </form>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+{% endblock %}

@@ -1,0 +1,123 @@
+{% extends 'base.html.twig' %}
+{% block title %}{{ course.name }}{% endblock %}
+{% block body %}
+    <header style="display:flex;align-items:center;gap:.6rem;">
+        <h1 class="page-title" style="margin:0;flex:1 1 auto;">{{ course.name }}</h1>
+        <div class="page-actions">
+            <a href="{{ path('app_course_grade_new', {id: course.id}) }}" class="btn">➕ Ajouter une note</a>
+            <form method="post" action="{{ path('app_course_delete', {id: course.id}) }}" onsubmit="return confirm('Supprimer ce cours et toutes ses notes ?');" style="display:inline;">
+                <input type="hidden" name="_token" value="{{ csrf_token('delete_course_' ~ course.id) }}">
+                <button class="btn btn-danger" title="Supprimer le cours" aria-label="Supprimer le cours">🗑️ Supprimer</button>
+            </form>
+        </div>
+    </header>
+
+    <div class="page-actions" style="margin-bottom:.6rem;">
+        <a href="{{ path('app_courses') }}" class="btn btn-ghost">⟵ Retour au menu</a>
+    </div>
+
+    <div class="kpis" style="margin:.2rem 0 1rem;">
+        {% if course.code %}<span class="badge badge-muted">Code : {{ course.code }}</span>{% endif %}
+        {% if course.ects %}<span class="badge badge-muted">ECTS : {{ course.ects }}</span>{% endif %}
+        <span class="badge badge-blue">Moyenne : {{ average is not null ? average ~ '/20' : '—' }}</span>
+    </div>
+
+    {% if course.description %}
+        <div class="card" style="margin-bottom:1rem;">
+            <div class="card-title">Description</div>
+            <p style="margin:.2rem 0 0;">{{ course.description }}</p>
+        </div>
+    {% endif %}
+
+    <div class="section">Notes</div>
+    {% if course.grades is empty %}
+        <div class="card">
+            <div class="card-title">Aucune note</div>
+            <p class="muted">Ajoute une première note pour ce cours.</p>
+            <div class="form-actions">
+                <a href="{{ path('app_course_grade_new', {id: course.id}) }}" class="btn">+ Ajouter une note</a>
+            </div>
+        </div>
+    {% else %}
+        <div class="card">
+            <table>
+                <thead>
+                <tr>
+                    <th>Intitulé</th><th>Type</th><th>Note</th><th>Coef</th><th>Date</th><th style="text-align:right;">Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for g in course.grades %}
+                    <tr>
+                        <td>{{ g.label }}</td>
+                        <td>{{ g.sessionType ? g.sessionType.value : '—' }}</td>
+                        <td>{{ g.score }}/20</td>
+                        <td>{{ g.weight ?? 1 }}</td>
+                        <td>{{ g.gradedAt ? g.gradedAt|date('Y-m-d') : '—' }}</td>
+                        <td style="text-align:right;">
+                            <form method="post" action="{{ path('app_course_grade_delete', {id: course.id, grade: g.id}) }}" onsubmit="return confirm('Supprimer cette note ?');" style="display:inline;">
+                                <input type="hidden" name="_token" value="{{ csrf_token('delete_grade_' ~ g.id) }}">
+                                <button class="icon-btn" title="Supprimer la note" aria-label="Supprimer la note">🗑️</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {# Données pour Chart.js #}
+        {% set gradesData = [] %}
+        {% for g in course.grades %}
+            {% set gradesData = gradesData|merge([{
+                'label': g.label,
+                'score': g.score,
+                'weight': g.weight ?? 1,
+                'type': g.sessionType ? g.sessionType.value : 'Autre',
+                'date': g.gradedAt ? g.gradedAt|date('Y-m-d') : null
+            }]) %}
+        {% endfor %}
+
+        <div class="section">Analyses</div>
+        <div class="charts">
+            <div class="chart-box">
+                <h3 style="margin:0 0 .5rem 0;font-size:1rem;color:#111827;">Évolution des notes</h3>
+                <canvas id="chartEvolution"></canvas>
+            </div>
+            <div class="chart-box">
+                <h3 style="margin:0 0 .5rem 0;font-size:1rem;color:#111827;">Répartition par type</h3>
+                <canvas id="chartType"></canvas>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+        <script>
+            const grades = {{ gradesData|json_encode|raw }};
+            grades.sort((a, b) => {
+                if (!a.date && !b.date) return (a.label || '').localeCompare(b.label || '');
+                if (!a.date) return -1; if (!b.date) return 1;
+                return a.date.localeCompare(b.date);
+            });
+            const labelsTime = grades.map(g => g.date || g.label || '—');
+            const scores = grades.map(g => Number(g.score ?? 0));
+
+            new Chart(document.getElementById('chartEvolution'), {
+                type: 'line',
+                data: { labels: labelsTime, datasets: [{ label: 'Note (/20)', data: scores, borderColor: '#2563eb',
+                        backgroundColor: 'rgba(37,99,235,.15)', pointBackgroundColor: '#2563eb', tension: .25, fill: true }] },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 0, max: 20, ticks: { stepSize: 2 } } } }
+            });
+
+            const typeMap = {}; grades.forEach(g => { const t = g.type || 'Autre'; typeMap[t] = (typeMap[t] || 0) + 1; });
+            const typeLabels = Object.keys(typeMap), typeValues = Object.values(typeMap);
+            const palette = ['#0ea5e9','#f59e0b','#10b981','#ef4444','#8b5cf6','#14b8a6','#eab308','#f97316','#22c55e','#3b82f6'];
+            const typeColors = typeLabels.map((_, i) => palette[i % palette.length]);
+
+            new Chart(document.getElementById('chartType'), {
+                type: 'doughnut',
+                data: { labels: typeLabels, datasets: [{ data: typeValues, backgroundColor: typeColors }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+            });
+        </script>
+    {% endif %}
+{% endblock %}

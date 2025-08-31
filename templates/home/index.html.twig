@@ -1,0 +1,58 @@
+{% extends 'base.html.twig' %}
+{% block title %}Bienvenue{% endblock %}
+{% block body %}
+    <main class="home">
+        <section class="hero">
+            <div class="hero-bg" aria-hidden="true"></div>
+            <div class="container">
+                <h1 class="title">Bienvenue 👋</h1>
+                <p class="subtitle">Gérez vos recettes, cours, finance et autres encore en toute confidentialité.</p>
+
+                <div class="cta">
+                    {% if app.user %}
+                        <a href="{{ path('app_dashboard') }}" class="btn btn-primary btn-lg">Aller au dashboard</a>
+                    {% else %}
+                        <a href="{{ path('app_register') }}" class="btn btn-primary btn-lg">Créer un compte</a>
+                        <a href="{{ path('app_login') }}" class="btn btn-ghost btn-lg">Se connecter</a>
+                    {% endif %}
+                </div>
+            </div>
+        </section>
+
+
+    </main>
+
+    <style>
+        :root{
+            --bg:#0b1020;
+            --fg:#e8eefc;
+            --muted:rgba(232,238,252,.75);
+            --card:rgba(255,255,255,.06);
+            --stroke:rgba(255,255,255,.12);
+            --primary:#2563eb;
+        }
+        .home{color:var(--fg);background:var(--bg)}
+        .container{max-width:1080px;margin:0 auto;padding:0 1rem}
+        .hero{position:relative;overflow:hidden;padding:5rem 0 3rem;text-align:center}
+        .hero-bg{position:absolute;inset:0;z-index:-1;background:
+            radial-gradient(900px 600px at 10% -10%, rgba(59,130,246,.25), transparent 60%),
+            radial-gradient(900px 600px at 90% 0%, rgba(16,185,129,.22), transparent 60%),
+            radial-gradient(700px 500px at 50% 120%, rgba(234,88,12,.18), transparent 60%)}
+        .title{font-size:clamp(2.2rem,5vw,3.4rem);line-height:1.05;margin:0 0 .6rem;font-weight:900}
+        .subtitle{color:var(--muted);font-size:clamp(1rem,2.2vw,1.2rem);margin:0 0 1.4rem}
+        .cta{display:flex;gap:.8rem;justify-content:center;flex-wrap:wrap}
+        .btn{display:inline-flex;align-items:center;justify-content:center;border-radius:12px;border:1px solid var(--stroke);font-weight:800;transition:transform .08s ease, filter .15s ease}
+        .btn-lg{padding:.9rem 1.2rem}
+        .btn-primary{background:var(--primary);color:#fff}
+        .btn-primary:hover{filter:brightness(1.05)}
+        .btn-ghost{background:transparent;color:var(--fg)}
+        .btn-ghost:hover{background:rgba(255,255,255,.06)}
+        .features{padding:2.5rem 0 4rem}
+        .grid{display:grid;gap:1rem;grid-template-columns:1fr}
+        @media(min-width:850px){.grid{grid-template-columns:repeat(3,1fr)}}
+        .card{background:var(--card);border:1px solid var(--stroke);border-radius:16px;padding:1.1rem;text-align:left;backdrop-filter:blur(6px)}
+        .card-ico{font-size:1.8rem}
+        .card-title{margin:.4rem 0;font-weight:900}
+        .card-text{color:var(--muted);margin:0}
+    </style>
+{% endblock %}

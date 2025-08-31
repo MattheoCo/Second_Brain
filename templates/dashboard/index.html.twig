@@ -1,0 +1,45 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ title|default('Dashboard') }}{% endblock %}
+
+{% block body %}
+    <h1 class="page-title">{{ title|default('Dashboard') }}</h1>
+
+    <section class="dashboard">
+        <a class="tile tile--agenda" href="{{ path('app_agenda') }}">
+            <div class="tile-icon">📅</div>
+            <div class="tile-title">Agenda</div>
+            <div class="tile-meta">Événements et rappels</div>
+        </a>
+
+        <a class="tile tile--courses" href="{{ path('app_courses') }}">
+            <div class="tile-icon">📚</div>
+            <div class="tile-title">Cours</div>
+            <div class="tile-meta">Voir les notes</div>
+        </a>
+
+        <a class="tile tile--tasks" href="{{ path('app_tasks') }}">
+            <div class="tile-icon">✅</div>
+            <div class="tile-title">Tâches</div>
+            <div class="tile-meta">Priorités et tags</div>
+        </a>
+
+        <a class="tile tile--finance" href="{{ path('app_finance') }}">
+            <div class="tile-icon">💰</div>
+            <div class="tile-title">Finances</div>
+            <div class="tile-meta">Comptes et transactions</div>
+        </a>
+
+        <a class="tile tile--recipes" href="{{ path('app_recipes') }}">
+            <div class="tile-icon">🍽️</div>
+            <div class="tile-title">Recettes</div>
+            <div class="tile-meta">Ingrédients et étapes</div>
+        </a>
+
+        <a class="tile tile--shopping" href="{{ path('app_shopping') }}">
+            <div class="tile-icon">🛒</div>
+            <div class="tile-title">Courses</div>
+            <div class="tile-meta">Liste d’achats</div>
+        </a>
+    </section>
+{% endblock %}

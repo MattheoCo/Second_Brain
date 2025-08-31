@@ -1,0 +1,390 @@
+{% extends 'base.html.twig' %}
+{% block title %}{{ title|default('Tâches') }}{% endblock %}
+    {% include '_partials/userdata_api.js' %}
+    (async () => {
+{% block body %}
+    <header class="task-header">
+        <h1 class="page-title">Tâches</h1>
+        <div class="toolbar">
+            <button id="btnExport" class="btn btn-ghost">📤 Exporter</button>
+            <button id="btnImport" class="btn btn-ghost">📥 Importer</button>
+        </div>
+    </header>
+
+    <div class="page-actions" style="margin-bottom:.6rem;">
+        <a href="{{ path('app_dashboard') }}" class="btn btn-ghost">⟵ Retour au menu</a>
+    </div>
+
+    <section class="card" style="margin:.8rem 0;">
+        <form id="addForm" class="task-add" autocomplete="off">
+            <input id="title" type="text" placeholder="Titre de la tâche" required />
+            <select id="prio" aria-label="Priorité">
+                <option value="Normal">Normal</option>
+                <option value="Faible">Faible</option>
+                <option value="Élevée">Élevée</option>
+                <option value="Critique">Critique</option>
+            </select>
+            <input id="due" type="date" />
+            <input id="tags" type="text" placeholder="Tags (séparés par des virgules)" />
+            <textarea id="desc" rows="1" placeholder="Description (optionnel)"></textarea>
+            <button class="btn" type="submit">Ajouter</button>
+        </form>
+
+        <div class="task-helpers">
+            <div class="tools">
+                <input id="search" type="search" placeholder="Rechercher…" />
+                <label class="toggle">
+                    <input id="toggleKanban" type="checkbox" />
+                    <span>Vue Kanban</span>
+                </label>
+                <label class="toggle">
+                    <input id="toggleHideDone" type="checkbox" />
+                    <span>Cacher Fait</span>
+                </label>
+            </div>
+            <div id="chips" class="chips" aria-label="Filtrer par tags"></div>
+        </div>
+    </section>
+
+    <section id="taskApp" class="task-app"></section>
+
+    <style>
+        .task-header{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+        .task-header .page-title{margin:0;flex:1 1 auto}
+        .toolbar{display:flex;gap:.4rem;flex:0 0 auto}
+
+        .task-add{display:grid;gap:.5rem;grid-template-columns:1fr}
+        .task-add input,.task-add select,.task-add textarea,.tools input[type="search"]{
+            width:100%;padding:.6rem .7rem;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:var(--bg-soft);color:var(--text)
+        }
+        .task-add textarea{resize:vertical;min-height:42px}
+        .task-add .btn{width:100%}
+        @media(min-width:900px){
+            .task-add{grid-template-columns:1.6fr auto auto 1.2fr 1.6fr auto;align-items:start}
+            .task-add .btn{width:auto}
+        }
+
+        .task-helpers{display:flex;gap:.8rem;align-items:center;justify-content:space-between;margin-top:.6rem;flex-wrap:wrap}
+        .chips{display:flex;gap:.35rem;flex-wrap:wrap;max-width:100%;overflow:visible;padding-bottom:0}
+        @media(max-width:719.98px){.chips{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:.2rem}.chip{flex:0 0 auto}}
+        .chip{padding:.25rem .55rem;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.08);font-weight:700;cursor:pointer;white-space:nowrap}
+        .chip.active{background:rgba(37,99,235,.22);border-color:rgba(37,99,235,.45)}
+        .tools{display:flex;gap:.6rem;align-items:center;flex:1 1 260px;flex-wrap:wrap}
+        .toggle{display:inline-flex;gap:.35rem;align-items:center;font-weight:700}
+
+        .task-app{display:grid;gap:.9rem}
+        /* Kanban responsive: 1->2->4 colonnes */
+        @media(min-width:900px){.task-app.kanban{grid-template-columns:repeat(2,1fr)}}
+        @media(min-width:1200px){.task-app.kanban{grid-template-columns:repeat(4,1fr)}}
+
+        .section{background:var(--card);border:1px solid rgba(255,255,255,.08);border-radius:14px;min-height:120px}
+        .section-header{display:flex;align-items:center;justify-content:space-between;padding:.55rem .8rem;border-bottom:1px solid rgba(255,255,255,.08);position:sticky;top:0;background:var(--card);z-index:1}
+        .section-title{display:flex;align-items:center;gap:.5rem;font-weight:800}
+        .section-body{display:grid;grid-template-columns:1fr;gap:.55rem;padding:.6rem}
+        .section-actions{display:flex;gap:.35rem;align-items:center}
+        .icon-btn{width:34px;height:34px}
+
+        .item{display:flex;align-items:stretch;gap:.45rem;padding:.5rem;border-radius:12px;border:1px solid rgba(255,255,255,.10);background:var(--bg-soft)}
+        .item[draggable="true"]{cursor:grab}
+        .item.dragging{opacity:.6}
+        .item-main{display:flex;flex-direction:column;gap:.25rem;flex:1 1 auto;min-width:0}
+        .item-top{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap}
+        .item-title[contenteditable="true"]{outline:none;border-bottom:1px dashed transparent}
+        .item-title[contenteditable="true"]:focus{border-color:rgba(59,130,246,.55)}
+        .item-desc{color:rgba(255,255,255,.75);font-size:.92rem;word-break:break-word}
+        .badges{display:inline-flex;gap:.3rem;align-items:center;flex-wrap:wrap}
+        .badge{padding:.05rem .45rem;border-radius:999px;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.16);font-weight:800;font-size:.78rem}
+        .badge-prio-Faible{background:rgba(16,185,129,.18);border-color:rgba(16,185,129,.45)}
+        .badge-prio-Normal{background:rgba(59,130,246,.16);border-color:rgba(59,130,246,.45)}
+        .badge-prio-Élevée{background:rgba(245,158,11,.20);border-color:rgba(245,158,11,.45)}
+        .badge-prio-Critique{background:rgba(239,68,68,.22);border-color:rgba(239,68,68,.50)}
+        .badge-due-over{background:rgba(239,68,68,.20);border-color:rgba(239,68,68,.45)}
+        .item-actions{display:flex;gap:.3rem;align-items:center}
+        .muted{color:rgba(255,255,255,.75)}
+
+        /* Liste: compacter sur petits écrans */
+        @media(max-width:540px){
+            .item{flex-direction:column}
+            .item-top{justify-content:space-between}
+        }
+    </style>
+
+    <script>
+        {% include '_partials/userdata_api.js' %}
+        (() => {
+            const STORAGE_KEY = 'tasks:v1';
+            const STATUSES = ['À faire','En cours','Bloqué','Fait'];
+            const ICONS = { 'À faire':'📝','En cours':'🚧','Bloqué':'⛔','Fait':'✅' };
+
+            const qs = (s,r=document)=>r.querySelector(s);
+            const qsa = (s,r=document)=>Array.from(r.querySelectorAll(s));
+            const fmtDate = d => d ? new Date(d).toISOString().slice(0,10) : '';
+            const todayStr = () => new Date().toISOString().slice(0,10);
+            const isOverdue = d => d && d < todayStr();
+
+            const state = {
+                tasks: await (async()=>{ try{return await apiLoad('tasks');}catch{return []} })(),
+                term: '',
+                tagSet: new Set(),
+                kanban: true,
+                hideDone: false,
+                draggingId: null,
+            };
+
+            const app = qs('#taskApp');
+            const addForm = qs('#addForm');
+            const inputTitle = qs('#title');
+            const inputDue = qs('#due');
+            const inputPrio = qs('#prio');
+            const inputTags = qs('#tags');
+            const inputDesc = qs('#desc');
+            const chips = qs('#chips');
+            const search = qs('#search');
+            const toggleKanban = qs('#toggleKanban');
+            const toggleHideDone = qs('#toggleHideDone');
+            const btnExport = qs('#btnExport');
+            const btnImport = qs('#btnImport');
+
+            addForm.addEventListener('submit', e => {
+                e.preventDefault();
+                const title = inputTitle.value.trim(); if(!title) return;
+                const task = {
+                    id: crypto.randomUUID(),
+                    title,
+                    desc: inputDesc.value.trim() || null,
+                    due: inputDue.value || null,
+                    prio: inputPrio.value || 'Normal',
+                    status: 'À faire',
+                    tags: parseTags(inputTags.value),
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                };
+                state.tasks.push(task); apiSave('tasks', state.tasks).catch(console.error);
+                addForm.reset(); inputPrio.value='Normal'; inputDue.value=''; render();
+            });
+
+            search.addEventListener('input', ()=>{ state.term = search.value.trim().toLowerCase(); render(); });
+            toggleKanban.addEventListener('change', ()=>{ state.kanban = toggleKanban.checked; render(); });
+            toggleHideDone.addEventListener('change', ()=>{ state.hideDone = toggleHideDone.checked; render(); });
+
+            btnExport.addEventListener('click', async ()=>{
+                const data = JSON.stringify(state.tasks, null, 2);
+                try{ await navigator.clipboard.writeText(data); alert('Export JSON copié ✅'); }
+                catch{ alert('Copie impossible.\n\n' + data); }
+            });
+            btnImport.addEventListener('click', ()=>{
+                const data = prompt('Coller un JSON de tâches :', ''); if(!data) return;
+                try{
+                    const arr = JSON.parse(data); if(!Array.isArray(arr)) throw new Error();
+                    arr.forEach(t=>t.id ||= crypto.randomUUID());
+                    state.tasks = arr; save(); render();
+                }catch{ alert('Format invalide.'); }
+            });
+
+            function render(){
+                app.classList.toggle('kanban', state.kanban);
+                app.innerHTML = '';
+                renderChips();
+                const items = filtered(state.tasks);
+                if(state.kanban) renderKanban(items);
+                else renderList(items);
+            }
+
+            function renderKanban(items){
+                const groups = groupBy(items, 'status');
+                // Colonnes connues
+                STATUSES.forEach(st=>{
+                    const colItems = groups[st] || [];
+                    app.appendChild(sectionElement(st, ICONS[st], colItems, st));
+                    delete groups[st];
+                });
+                // Colonnes supplémentaires inconnues
+                Object.keys(groups).forEach(st=>{
+                    app.appendChild(sectionElement(st, '📌', groups[st], st));
+                });
+            }
+
+            function renderList(items){
+                app.appendChild(sectionElement('Toutes', '📋', items, null));
+            }
+
+            function sectionElement(title, icon, items, sectionStatus){
+                const root = document.createElement('div');
+                root.className = 'section';
+                root.innerHTML = `
+      <div class="section-header">
+        <div class="section-title"><span>${icon}</span><span>${escapeHtml(title)}</span><span class="muted">(${items.length})</span></div>
+        <div class="section-actions">
+          ${sectionStatus? `<button class="icon-btn btn btn-ghost add-here" title="Ajouter ici">＋</button>`:''}
+        </div>
+      </div>
+      <div class="section-body" ${sectionStatus?`data-status="${escapeAttr(sectionStatus)}"`:''}></div>
+    `;
+                const body = root.querySelector('.section-body');
+
+                // Empty-column drop
+                body.addEventListener('dragover', e=>{
+                    e.preventDefault();
+                    const dragId = state.draggingId; if(!dragId) return;
+                    const srcIdx = state.tasks.findIndex(t=>t.id===dragId);
+                    if(srcIdx<0) return;
+                    const src = state.tasks[srcIdx];
+                    if(sectionStatus && src.status !== sectionStatus){ src.status = sectionStatus; }
+                    // Move to end of column in global order
+                    // Remove then push to end
+                    state.tasks.splice(srcIdx,1);
+                    state.tasks.push(src);
+                    src.updatedAt = new Date().toISOString();
+                    save(); render();
+                });
+
+                if(sectionStatus){
+                    const btnAdd = root.querySelector('.add-here');
+                    btnAdd?.addEventListener('click', ()=>{
+                        const title = prompt(`Nouveau dans "${sectionStatus}" :`, ''); if(!title) return;
+                        state.tasks.push({ id: crypto.randomUUID(), title: title.trim(), desc:null, due:null, prio:'Normal', status: sectionStatus, tags:[], createdAt:new Date().toISOString(), updatedAt:new Date().toISOString() });
+                        save(); render();
+                    });
+                }
+
+                items.forEach((it)=> body.appendChild(itemElement(it, sectionStatus)));
+                return root;
+            }
+
+            function itemElement(it, sectionStatus){
+                const el = document.createElement('div');
+                el.className = 'item';
+                el.draggable = true;
+                el.dataset.id = it.id;
+                const dueCls = it.due && isOverdue(it.due) && it.status!=='Fait' ? 'badge-due-over' : '';
+                el.innerHTML = `
+      <div class="item-main">
+        <div class="item-top">
+          <div class="badges">
+            <span class="badge badge-prio-${escapeAttr(it.prio)}">${escapeHtml(it.prio)}</span>
+            ${it.due? `<span class="badge ${dueCls}" title="Échéance">${escapeHtml(it.due)}</span>`:''}
+            ${(it.tags||[]).map(t=>`<span class="badge">#${escapeHtml(t)}</span>`).join('')}
+          </div>
+          <select class="st-select">
+            ${statusOptions(it.status)}
+          </select>
+        </div>
+        <div class="item-title" contenteditable="true">${escapeHtml(it.title)}</div>
+        ${it.desc? `<div class="item-desc">${escapeHtml(it.desc)}</div>`:''}
+      </div>
+      <div class="item-actions">
+        <button class="icon-btn btn btn-ghost" title="Marquer Fait">✅</button>
+        <button class="icon-btn btn btn-ghost" title="Dupliquer">📄</button>
+        <button class="icon-btn btn btn-ghost" title="Supprimer">🗑️</button>
+      </div>
+    `;
+
+                // Drag & drop (réordonnancement + changement de colonne)
+                el.addEventListener('dragstart', ()=>{ el.classList.add('dragging'); state.draggingId = it.id; });
+                el.addEventListener('dragend', ()=>{ el.classList.remove('dragging'); state.draggingId = null; });
+                el.addEventListener('dragover', e=>{
+                    e.preventDefault();
+                    const dragId = state.draggingId; if(!dragId || dragId===it.id) return;
+                    const srcIdx = state.tasks.findIndex(t=>t.id===dragId);
+                    const dstIdx = state.tasks.findIndex(t=>t.id===it.id);
+                    if(srcIdx<0 || dstIdx<0) return;
+                    const src = state.tasks[srcIdx];
+                    if(sectionStatus && src.status !== sectionStatus){ src.status = sectionStatus; }
+                    move(state.tasks, srcIdx, dstIdx);
+                    src.updatedAt = new Date().toISOString();
+                    apiSave('tasks', state.tasks).catch(console.error); render();
+                });
+
+                // Edition titre
+                const titleEl = el.querySelector('.item-title');
+                titleEl.addEventListener('blur', ()=>{
+                    const v = titleEl.textContent.trim();
+                    if(v){ it.title = v; it.updatedAt = new Date().toISOString(); save(); }
+                    render();
+                });
+                titleEl.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); titleEl.blur(); } });
+
+                // Changement statut
+                el.querySelector('.st-select').addEventListener('change', e=>{ it.status = e.target.value; it.updatedAt=new Date().toISOString(); save(); render(); });
+
+                // Actions
+                const [btnDone, btnDup, btnDel] = el.querySelectorAll('.item-actions .icon-btn');
+                btnDone.addEventListener('click', ()=>{
+                    it.status = 'Fait'; it.updatedAt=new Date().toISOString(); apiSave('tasks', state.tasks).catch(console.error); render();
+                });
+                btnDup.addEventListener('click', ()=>{
+                    const copy = JSON.parse(JSON.stringify(it));
+                    copy.id = crypto.randomUUID();
+                    copy.title = it.title + ' (copie)';
+                    copy.createdAt = new Date().toISOString();
+                    copy.updatedAt = new Date().toISOString();
+                    state.tasks.push(copy); apiSave('tasks', state.tasks).catch(console.error); render();
+                });
+                btnDel.addEventListener('click', ()=>{
+                    if(!confirm('Supprimer cette tâche ?')) return;
+                    state.tasks = state.tasks.filter(t=>t.id!==it.id); apiSave('tasks', state.tasks).catch(console.error); render();
+                });
+
+                return el;
+            }
+
+            function renderChips(){
+                const all = new Set();
+                state.tasks.forEach(t=> (t.tags||[]).forEach(tag=>all.add(tag)));
+                chips.innerHTML = '';
+                if(!all.size){
+                    chips.innerHTML = '<span class="muted">Aucun tag pour le moment.</span>';
+                    return;
+                }
+                all.forEach(tag=>{
+                    const b = document.createElement('button');
+                    b.type='button'; b.className='chip'; b.textContent = tag;
+                    b.classList.toggle('active', state.tagSet.has(tag));
+                    b.addEventListener('click', ()=>{
+                        if(state.tagSet.has(tag)) state.tagSet.delete(tag); else state.tagSet.add(tag);
+                        render();
+                    });
+                    chips.appendChild(b);
+                });
+                // Chip pour réinitialiser les filtres
+                const clear = document.createElement('button');
+                clear.type='button'; clear.className='chip'; clear.textContent='Tout';
+                clear.title='Effacer les filtres tags';
+                clear.addEventListener('click', ()=>{ state.tagSet.clear(); render(); });
+                chips.prepend(clear);
+            }
+
+            function filtered(arr){
+                return arr.filter(t=>{
+                    if(state.hideDone && t.status==='Fait') return false;
+                    if(state.term){
+                        const hay = `${t.title} ${t.desc||''} ${(t.tags||[]).join(' ')}`.toLowerCase();
+                        if(!hay.includes(state.term)) return false;
+                    }
+                    if(state.tagSet.size){
+                        const has = (t.tags||[]).some(tag=>state.tagSet.has(tag));
+                        if(!has) return false;
+                    }
+                    return true;
+                });
+            }
+            function groupBy(arr, key){
+                return arr.reduce((acc,it)=>{ const k = it[key] || 'Autre'; (acc[k] ||= []).push(it); return acc; },{});
+            }
+            function statusOptions(sel){
+                const set = new Set([...(sel && !STATUSES.includes(sel)?[sel]:[]), ...STATUSES]);
+                return [...set].map(s=>`<option value="${escapeAttr(s)}" ${s===sel?'selected':''}>${escapeHtml(s)}</option>`).join('');
+            }
+            function parseTags(v){ return (v||'').split(',').map(s=>s.trim()).filter(Boolean); }
+            function move(arr, from, to){ if(from===to || from<0 || to<0) return; const [x]=arr.splice(from,1); arr.splice(to,0,x); }
+            async function load(){ try{ return await apiLoad('tasks'); }catch{ return []; } }
+            function save(){ apiSave('tasks', tasks).catch(console.error); }
+            function escapeHtml(s){ return (s??'').toString().replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
+            function escapeAttr(s){ return (s??'').toString().replace(/"/g,'&quot;'); }
+
+            toggleKanban.checked = state.kanban;
+            toggleHideDone.checked = state.hideDone;
+            render();
+        })();
+    </script>
+{% endblock %}
