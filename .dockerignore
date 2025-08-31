@@ -1,0 +1,13 @@
+# Prune local dev artifacts from the image context
+.git
+.gitignore
+node_modules
+var/cache
+var/log
+vendor
+public/build
+public/assets
+uploads
+.DS_Store
+.idea
+.vscode
