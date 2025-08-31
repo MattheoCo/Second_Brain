@@ -22,6 +22,15 @@ if echo "${DATABASE_URL:-}" | grep -qE '^postgres'; then
   done
 fi
 
+# In production, enforce Postgres URL to avoid unintended MySQL drivers on PaaS
+if [ "${APP_ENV:-prod}" = "prod" ]; then
+  if ! echo "${DATABASE_URL:-}" | grep -qE '^postgres'; then
+    echo "ERROR: DATABASE_URL must start with postgresql:// and include serverVersion & sslmode (e.g. postgresql://...?...serverVersion=16&sslmode=require&charset=utf8)"
+    echo "Current DATABASE_URL: ${DATABASE_URL:-<empty>}"
+    exit 1
+  fi
+fi
+
 # Install deps (avoid auto-scripts in prod to prevent premature cache:clear)
 if [ "${APP_ENV:-prod}" = "prod" ]; then
   composer install --no-interaction --prefer-dist --no-progress --no-dev --no-scripts
