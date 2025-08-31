@@ -5,7 +5,17 @@ set -eu
 if echo "${DATABASE_URL:-}" | grep -qE '^postgres'; then
   echo "Waiting for Postgres..."
   ATTEMPTS=0
-  until php -r 'try{$d=parse_url(getenv("DATABASE_URL"));$dsn=sprintf("pgsql:host=%s;port=%s;dbname=%s",$d["host"],$d["port"]??5432,trim($d["path"],"/"));new PDO($dsn,$d["user"],$d["pass"],[PDO::ATTR_TIMEOUT=>1]);echo "ok\n";exit(0);}catch(Exception $e){exit(1);}'; do
+  until php -r '
+    try {
+      $url = getenv("DATABASE_URL");
+      $d = parse_url($url);
+      parse_str(parse_url($url, PHP_URL_QUERY) ?: "", $q);
+      $ssl = isset($q["sslmode"]) ? ";sslmode=".$q["sslmode"] : "";
+      $dsn = sprintf("pgsql:host=%s;port=%s;dbname=%s%s", $d["host"], $d["port"] ?? 5432, trim($d["path"], "/"), $ssl);
+      new PDO($dsn, $d["user"] ?? null, $d["pass"] ?? null, [PDO::ATTR_TIMEOUT => 1]);
+      echo "ok\n"; exit(0);
+    } catch (Exception $e) { exit(1); }
+  ' ; do
     ATTEMPTS=$((ATTEMPTS+1))
     if [ "$ATTEMPTS" -gt 30 ]; then echo "DB not ready"; exit 1; fi
     sleep 2
