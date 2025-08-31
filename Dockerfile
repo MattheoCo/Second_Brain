@@ -19,8 +19,9 @@ COPY . .
 COPY scripts/entrypoint.sh /usr/local/bin/app-entrypoint.sh
 RUN chmod +x /usr/local/bin/app-entrypoint.sh
 
-ENV APP_ENV=dev \
-    APP_DEBUG=1
+# Default to production-safe settings; override locally if needed
+ENV APP_ENV=prod \
+    APP_DEBUG=0
 
 EXPOSE 8080
 

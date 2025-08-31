@@ -12,15 +12,24 @@ if echo "${DATABASE_URL:-}" | grep -qE '^postgres'; then
   done
 fi
 
-# Install deps
-if [ ! -d vendor ]; then
-  composer install --no-interaction --prefer-dist --no-progress
+# Install deps (avoid auto-scripts in prod to prevent premature cache:clear)
+if [ "${APP_ENV:-prod}" = "prod" ]; then
+  composer install --no-interaction --prefer-dist --no-progress --no-dev --no-scripts
 else
-  composer dump-autoload --no-interaction
+  if [ ! -d vendor ]; then
+    composer install --no-interaction --prefer-dist --no-progress
+  else
+    composer dump-autoload --no-interaction
+  fi
 fi
 
-# Warmup cache (ignore failures in dev)
-php bin/console cache:warmup || true
+# Warmup cache (be strict in prod)
+if [ "${APP_ENV:-prod}" = "prod" ]; then
+  php bin/console cache:clear --no-warmup || true
+  php bin/console cache:warmup
+else
+  php bin/console cache:warmup || true
+fi
 
 # Apply DB schema
 if [ -f bin/console ]; then
