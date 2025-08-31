@@ -1,7 +1,5 @@
 {% extends 'base.html.twig' %}
 {% block title %}{{ title|default('Tâches') }}{% endblock %}
-    {% include '_partials/userdata_api.js' %}
-    (async () => {
 {% block body %}
     <header class="task-header">
         <h1 class="page-title">Tâches</h1>
@@ -378,13 +376,13 @@
             function parseTags(v){ return (v||'').split(',').map(s=>s.trim()).filter(Boolean); }
             function move(arr, from, to){ if(from===to || from<0 || to<0) return; const [x]=arr.splice(from,1); arr.splice(to,0,x); }
             async function load(){ try{ return await apiLoad('tasks'); }catch{ return []; } }
-            function save(){ apiSave('tasks', tasks).catch(console.error); }
+            function save(){ apiSave('tasks', state.tasks).catch(console.error); }
             function escapeHtml(s){ return (s??'').toString().replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
             function escapeAttr(s){ return (s??'').toString().replace(/"/g,'&quot;'); }
 
             toggleKanban.checked = state.kanban;
             toggleHideDone.checked = state.hideDone;
             render();
-        })();
+    })();
     </script>
 {% endblock %}
