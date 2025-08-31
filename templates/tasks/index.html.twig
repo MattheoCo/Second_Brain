@@ -109,7 +109,7 @@
 
     <script>
         {% include '_partials/userdata_api.js' %}
-        (() => {
+        (async () => {
             const STORAGE_KEY = 'tasks:v1';
             const STATUSES = ['À faire','En cours','Bloqué','Fait'];
             const ICONS = { 'À faire':'📝','En cours':'🚧','Bloqué':'⛔','Fait':'✅' };
