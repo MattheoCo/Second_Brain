@@ -16,3 +16,10 @@ services:
       MP_SMTP_AUTH_ACCEPT_ANY: 1
       MP_SMTP_AUTH_ALLOW_INSECURE: 1
 ###< symfony/mailer ###
+
+  app:
+    environment:
+      # Force DB to the Compose service host, ignoring .env host value
+      DATABASE_URL: postgresql://app:!ChangeMe!@database:5432/app?serverVersion=16&charset=utf8
+      APP_ENV: dev
+      APP_DEBUG: 1

@@ -17,7 +17,9 @@ COPY . .
 
 # Entrypoint script
 COPY scripts/entrypoint.sh /usr/local/bin/app-entrypoint.sh
-RUN chmod +x /usr/local/bin/app-entrypoint.sh
+# Normalize potential Windows CRLF line endings and ensure executable
+RUN sed -i 's/\r$//' /usr/local/bin/app-entrypoint.sh \
+    && chmod +x /usr/local/bin/app-entrypoint.sh
 
 # Default to production-safe settings; override locally if needed
 ENV APP_ENV=prod \
