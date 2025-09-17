@@ -1,7 +1,42 @@
 #!/usr/bin/env sh
 set -eu
 
-# Wait for Postgres if DATABASE_URL is set to postgres
+# Build/normalize DATABASE_URL for PaaS (e.g., Railway) and wait for Postgres
+
+# 1) If DATABASE_URL is empty or not postgres, try to construct it from PG* env vars (Railway provides these)
+if [ -z "${DATABASE_URL:-}" ] || ! echo "${DATABASE_URL:-}" | grep -qE '^postgres'; then
+  if [ -n "${PGHOST:-}" ] && [ -n "${PGUSER:-}" ] && [ -n "${PGDATABASE:-}" ]; then
+    PGPORT="${PGPORT:-5432}"
+    if [ -n "${PGPASSWORD:-}" ]; then
+      export DATABASE_URL="postgresql://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/${PGDATABASE}"
+    else
+      export DATABASE_URL="postgresql://${PGUSER}@${PGHOST}:${PGPORT}/${PGDATABASE}"
+    fi
+  fi
+fi
+
+# 2) If DATABASE_URL is postgres, ensure required query params exist (serverVersion, sslmode, charset)
+if echo "${DATABASE_URL:-}" | grep -qE '^postgres'; then
+  # Append serverVersion if missing
+  if ! echo "${DATABASE_URL}" | grep -q 'serverVersion='; then
+    SV="${POSTGRES_VERSION:-16}"
+    SEP='?'; echo "${DATABASE_URL}" | grep -q '?' && SEP='&'
+    DATABASE_URL="${DATABASE_URL}${SEP}serverVersion=${SV}"
+  fi
+  # Append sslmode if missing (most managed DBs require TLS)
+  if ! echo "${DATABASE_URL}" | grep -q 'sslmode='; then
+    SEP='?'; echo "${DATABASE_URL}" | grep -q '?' && SEP='&'
+    DATABASE_URL="${DATABASE_URL}${SEP}sslmode=${SSL_MODE:-require}"
+  fi
+  # Append charset if missing
+  if ! echo "${DATABASE_URL}" | grep -q 'charset='; then
+    SEP='?'; echo "${DATABASE_URL}" | grep -q '?' && SEP='&'
+    DATABASE_URL="${DATABASE_URL}${SEP}charset=utf8"
+  fi
+  export DATABASE_URL
+fi
+
+# Wait for Postgres if DATABASE_URL is postgres
 if echo "${DATABASE_URL:-}" | grep -qE '^postgres'; then
   echo "Waiting for Postgres..."
   ATTEMPTS=0
