@@ -5,13 +5,19 @@ set -eu
 
 # 1) If DATABASE_URL is empty or not postgres, try to construct it from PG* env vars (Railway provides these)
 if [ -z "${DATABASE_URL:-}" ] || ! echo "${DATABASE_URL:-}" | grep -qE '^postgres'; then
-  if [ -n "${PGHOST:-}" ] && [ -n "${PGUSER:-}" ] && [ -n "${PGDATABASE:-}" ]; then
-    PGPORT="${PGPORT:-5432}"
-    if [ -n "${PGPASSWORD:-}" ]; then
-      export DATABASE_URL="postgresql://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/${PGDATABASE}"
+  # Gather possible env var names from PaaS providers
+  _HOST="${PGHOST:-${POSTGRES_HOST:-${DB_HOST:-}}}"
+  _PORT="${PGPORT:-${POSTGRES_PORT:-${DB_PORT:-5432}}}"
+  _USER="${PGUSER:-${POSTGRES_USER:-${DB_USER:-}}}"
+  _PASS="${PGPASSWORD:-${POSTGRES_PASSWORD:-${DB_PASSWORD:-}}}"
+  _DB="${PGDATABASE:-${POSTGRES_DB:-${DB_NAME:-}}}"
+  if [ -n "${_HOST}" ] && [ -n "${_USER}" ] && [ -n "${_DB}" ]; then
+    if [ -n "${_PASS}" ]; then
+      export DATABASE_URL="postgresql://${_USER}:${_PASS}@${_HOST}:${_PORT}/${_DB}"
     else
-      export DATABASE_URL="postgresql://${PGUSER}@${PGHOST}:${PGPORT}/${PGDATABASE}"
+      export DATABASE_URL="postgresql://${_USER}@${_HOST}:${_PORT}/${_DB}"
     fi
+    unset _HOST _PORT _USER _PASS _DB
   fi
 fi
 
