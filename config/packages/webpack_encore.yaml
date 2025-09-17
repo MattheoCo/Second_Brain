@@ -1,5 +1,13 @@
-webpack_encore:
-  # Must match Encore.setOutputPath() in webpack.config.js
-  output_path: '%kernel.project_dir%/public/build'
-  # Optional: when using multiple builds, define them here
-  # builds: {}
+when@dev:
+  webpack_encore:
+    # Must match Encore.setOutputPath() in webpack.config.js
+    output_path: '%kernel.project_dir%/public/build'
+    # Optional: when using multiple builds, define them here
+    # builds: {}
+
+when@test:
+  webpack_encore:
+    # Must match Encore.setOutputPath() in webpack.config.js
+    output_path: '%kernel.project_dir%/public/build'
+    # Optional: when using multiple builds, define them here
+    # builds: {}
